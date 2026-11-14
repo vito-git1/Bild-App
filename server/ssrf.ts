@@ -1,6 +1,6 @@
 import dns from 'node:dns';
 import net from 'node:net';
-import { Agent } from 'undici';
+import { Agent, buildConnector } from 'undici';
 
 /** Erlaubt Ziele in privaten Netzen, z. B. eine n8n-Instanz im LAN. */
 const ALLOW_PRIVATE = process.env.ALLOW_PRIVATE_WEBHOOKS === 'true';
@@ -134,8 +134,23 @@ const guardedLookup: net.LookupFunction = (hostname, options, callback) => {
   });
 };
 
+const baseConnector = buildConnector({ lookup: guardedLookup });
+
+/**
+ * Bei IP-Literalen (z. B. Redirect auf http://127.0.0.1/) findet keine DNS-Auflösung statt,
+ * guardedLookup würde also nie aufgerufen. Deshalb hier zusätzlich vor jedem Verbindungsaufbau prüfen.
+ */
+const guardedConnector: buildConnector.connector = (options, callback) => {
+  const host = options.hostname.replace(/^\[|\]$/g, '');
+  if (!ALLOW_PRIVATE && net.isIP(host) && isPrivateAddress(host)) {
+    callback(new UrlValidationError(`Private oder lokale IP-Adresse ${host} ist als Ziel gesperrt.`, 403), null);
+    return;
+  }
+  baseConnector(options, callback);
+};
+
 export const guardedAgent = new Agent({
-  connect: { lookup: guardedLookup },
+  connect: guardedConnector,
   headersTimeout: 125_000,
   bodyTimeout: 125_000,
 });

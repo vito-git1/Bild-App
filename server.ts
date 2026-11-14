@@ -22,6 +22,15 @@ if (!WEBHOOK_URL) {
 }
 const IS_PROD = process.argv.includes('--prod') || process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT ?? 3000);
+/** Standardmäßig nur auf diesem Rechner erreichbar. HOST=0.0.0.0 öffnet den Server fürs Netzwerk. */
+const HOST = process.env.HOST?.trim() || '127.0.0.1';
+/** Optionales gemeinsames Geheimnis; wird als Header an n8n gesendet (Header Auth im Webhook-Node). */
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET?.trim() ?? '';
+const WEBHOOK_SECRET_HEADER = 'X-Kleiderstudio-Secret';
+
+/** Schutz vor Kosten-Missbrauch: Anfragen pro IP und Minute sowie gleichzeitige Generierungen. */
+const RATE_LIMIT_PER_MINUTE = Number(process.env.RATE_LIMIT_PER_MINUTE ?? 10);
+const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT ?? 3);
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_RESPONSE_BYTES = 60 * 1024 * 1024;
@@ -62,18 +71,80 @@ const upload = multer({
 const app = express();
 app.disable('x-powered-by');
 
+// Sicherheits-Header für alle Antworten.
+app.use((_req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'X-Frame-Options': 'DENY',
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  });
+  if (IS_PROD) {
+    res.set(
+      'Content-Security-Policy',
+      [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' https://fonts.googleapis.com",
+        "font-src https://fonts.gstatic.com",
+        "img-src 'self' blob: data:",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'none'",
+      ].join('; '),
+    );
+  }
+  next();
+});
+
+const requestLog = new Map<string, number[]>();
+let activeGenerations = 0;
+
+/** Einfache In-Memory-Drosselung für den kostenpflichtigen Endpunkt. */
+function rateLimit(req: Request, _res: Response, next: NextFunction) {
+  const key = req.ip ?? 'unbekannt';
+  const now = Date.now();
+  const recent = (requestLog.get(key) ?? []).filter((time) => now - time < 60_000);
+  if (recent.length >= RATE_LIMIT_PER_MINUTE) {
+    requestLog.set(key, recent);
+    next(new ProxyError(429, 'Zu viele Anfragen. Bitte eine Minute warten.'));
+    return;
+  }
+  if (activeGenerations >= MAX_CONCURRENT) {
+    next(new ProxyError(429, 'Gerade laufen zu viele Generierungen. Bitte gleich erneut versuchen.'));
+    return;
+  }
+  recent.push(now);
+  requestLog.set(key, recent);
+  if (requestLog.size > 10_000) requestLog.clear();
+  next();
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
 
 app.post(
   '/api/webhook',
+  rateLimit,
   upload.fields([
     { name: 'image1', maxCount: 1 },
     { name: 'image2', maxCount: 1 },
   ]),
   async (req: Request, res: Response, next: NextFunction) => {
     const startedAt = performance.now();
+    activeGenerations += 1;
+    let released = false;
+    const release = () => {
+      if (!released) {
+        released = true;
+        activeGenerations -= 1;
+      }
+    };
+    res.on('close', release);
 
     try {
       const files = req.files as Record<string, Express.Multer.File[] | undefined> | undefined;
@@ -103,7 +174,10 @@ app.post(
           body: form,
           signal,
           dispatcher: guardedAgent,
-          headers: { Accept: 'image/*, application/octet-stream, application/json;q=0.9, */*;q=0.5' },
+          headers: {
+            Accept: 'image/*, application/octet-stream, application/json;q=0.9, */*;q=0.5',
+            ...(WEBHOOK_SECRET ? { [WEBHOOK_SECRET_HEADER]: WEBHOOK_SECRET } : {}),
+          },
         });
       } catch (error) {
         throw translateFetchError(error, timeoutSignal, clientAbort.signal);
@@ -120,10 +194,13 @@ app.post(
           'X-Processing-Time-Ms': String(Math.round(performance.now() - startedAt)),
           'X-Result-Source': payload.source,
           'Cache-Control': 'no-store',
+          'Content-Security-Policy': "default-src 'none'; sandbox",
         })
         .end(payload.buffer);
     } catch (error) {
       next(error);
+    } finally {
+      release();
     }
   },
 );
@@ -213,10 +290,7 @@ async function readImagePayload(
   const sniffed = sniffImageMime(buffer);
   if (sniffed) return { buffer, mime: sniffed, source: 'binary' };
 
-  if (contentType.startsWith('image/') && buffer.length > 0) {
-    // Formate ohne Magic-Byte-Prüfung (z. B. SVG) mit deklariertem Typ durchreichen.
-    return { buffer, mime: contentType.split(';')[0].trim(), source: 'binary' };
-  }
+  // Nur per Magic Bytes erkannte Rasterformate werden durchgereicht – kein SVG (könnte Skripte enthalten).
 
   const json = tryParseJson(buffer);
   if (json !== undefined) {
@@ -330,6 +404,7 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: 'Interner Serverfehler.' } satisfies ProxyErrorBody);
 });
 
-app.listen(PORT, () => {
-  console.log(`Kleiderstudio läuft auf http://localhost:${PORT} (${IS_PROD ? 'Produktion' : 'Entwicklung'})`);
+app.listen(PORT, HOST, () => {
+  const shown = HOST === '127.0.0.1' ? 'localhost' : HOST;
+  console.log(`Kleiderstudio läuft auf http://${shown}:${PORT} (${IS_PROD ? 'Produktion' : 'Entwicklung'})`);
 });
