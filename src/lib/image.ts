@@ -120,7 +120,12 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number):
   });
 }
 
-async function drawToCanvas(blob: Blob, fillBackground: boolean): Promise<HTMLCanvasElement> {
+/** Längste Bildseite beim Upload. Hält beide Bilder sicher unter dem Vercel-Limit von 4,5 MB pro Anfrage. */
+export const MAX_UPLOAD_DIMENSION = 2048;
+/** Bis zu dieser Größe darf ein Bild unverändert gesendet werden. */
+const MAX_UNCHANGED_BYTES = 1.5 * 1024 * 1024;
+
+async function drawToCanvas(blob: Blob, fillBackground: boolean, maxDimension: number): Promise<HTMLCanvasElement> {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Canvas wird von diesem Browser nicht unterstützt.');
@@ -142,14 +147,21 @@ async function drawToCanvas(blob: Blob, fillBackground: boolean): Promise<HTMLCa
     height = image.naturalHeight;
   }
 
+  const scale = Math.min(1, maxDimension / Math.max(width, height));
+  const sourceWidth = width;
+  const sourceHeight = height;
+  width = Math.max(1, Math.round(width * scale));
+  height = Math.max(1, Math.round(height * scale));
+
   canvas.width = width;
   canvas.height = height;
+  context.imageSmoothingQuality = 'high';
   if (fillBackground) {
     // JPEG kennt keine Transparenz – transparente Bereiche werden weiß.
     context.fillStyle = '#ffffff';
     context.fillRect(0, 0, width, height);
   }
-  context.drawImage(source, 0, 0, width, height);
+  context.drawImage(source, 0, 0, sourceWidth, sourceHeight, 0, 0, width, height);
   bitmap?.close();
   return canvas;
 }
@@ -159,20 +171,23 @@ export interface PreparedUpload {
   name: string;
 }
 
-/** Konvertiert ein Bild clientseitig in das gewählte Upload-Format. */
+/** Konvertiert und verkleinert ein Bild clientseitig für den Upload. */
 export async function prepareUpload(asset: ImageAsset, format: UploadFormat): Promise<PreparedUpload> {
-  if (format === 'original') return { blob: asset.blob, name: asset.name };
+  const fitsLimits =
+    Math.max(asset.width, asset.height) <= MAX_UPLOAD_DIMENSION && asset.size <= MAX_UNCHANGED_BYTES;
 
-  const targetType = format === 'webp' ? 'image/webp' : 'image/jpeg';
-  if (asset.type === targetType) return { blob: asset.blob, name: asset.name };
+  const targetType = format === 'jpeg' ? 'image/jpeg' : 'image/webp';
+  if (fitsLimits && (format === 'original' || asset.type === targetType)) {
+    return { blob: asset.blob, name: asset.name };
+  }
 
-  const canvas = await drawToCanvas(asset.blob, targetType === 'image/jpeg');
-  let blob = await canvasToBlob(canvas, targetType, 0.92);
+  const canvas = await drawToCanvas(asset.blob, targetType === 'image/jpeg', MAX_UPLOAD_DIMENSION);
+  let blob = await canvasToBlob(canvas, targetType, 0.9);
 
   // Browser ohne WebP-Encoder liefern stillschweigend PNG – dann auf JPEG ausweichen.
   if (blob.type !== targetType) {
-    const jpegCanvas = targetType === 'image/webp' ? await drawToCanvas(asset.blob, true) : canvas;
-    blob = await canvasToBlob(jpegCanvas, 'image/jpeg', 0.92);
+    const jpegCanvas = targetType === 'image/webp' ? await drawToCanvas(asset.blob, true, MAX_UPLOAD_DIMENSION) : canvas;
+    blob = await canvasToBlob(jpegCanvas, 'image/jpeg', 0.9);
   }
 
   return { blob, name: replaceExtension(asset.name, extensionForMime(blob.type)) };
