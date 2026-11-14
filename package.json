@@ -1,0 +1,37 @@
+{
+  "name": "kleiderstudio",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Zwei-Bild-Komposition (Virtual Try-On) über einen n8n-Webhook",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --ignore ./src --ignore ./dist server.ts",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx server.ts --prod",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20.11"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "lucide-react": "^1.73.0",
+    "multer": "^2.5.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsx": "^4.23.15",
+    "undici": "^8.12.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}

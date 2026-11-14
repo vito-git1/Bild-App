@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EEEDEA"/>
+      <stop offset="1" stop-color="#DFDDD8"/>
+    </linearGradient>
+    <linearGradient id="fabric" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4A5A73"/>
+      <stop offset="1" stop-color="#2F3B4F"/>
+    </linearGradient>
+  </defs>
+  <rect width="768" height="1024" fill="url(#paper)"/>
+  <g transform="translate(0 40)">
+    <path d="M300 200 C330 186 352 182 384 182 C416 182 438 186 468 200 L608 300 L560 430 L512 400 L516 820 L252 820 L256 400 L208 430 L160 300 Z" fill="#000" opacity="0.10" transform="translate(8 14)"/>
+    <path d="M300 200 C330 186 352 182 384 182 C416 182 438 186 468 200 L608 300 L560 430 L512 400 L516 820 L252 820 L256 400 L208 430 L160 300 Z" fill="url(#fabric)"/>
+    <path d="M330 192 L384 290 L438 192 L416 184 L384 236 L352 184 Z" fill="#F2F0EC"/>
+    <path d="M384 290 L384 820" stroke="#24303F" stroke-width="3"/>
+    <g fill="#D7D3CC">
+      <circle cx="396" cy="360" r="7"/><circle cx="396" cy="460" r="7"/>
+      <circle cx="396" cy="560" r="7"/><circle cx="396" cy="660" r="7"/><circle cx="396" cy="760" r="7"/>
+    </g>
+    <path d="M292 470 h64 v70 h-64 z M412 470 h64 v70 h-64 z" fill="none" stroke="#24303F" stroke-width="3"/>
+    <path d="M208 430 L256 400 M560 430 L512 400" stroke="#24303F" stroke-width="3"/>
+    <path d="M252 800 h264" stroke="#24303F" stroke-width="3" stroke-dasharray="6 6"/>
+  </g>
+</svg>
