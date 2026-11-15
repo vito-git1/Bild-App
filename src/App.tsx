@@ -1,22 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LoaderCircle } from 'lucide-react';
 import { ActionBar } from './components/ActionBar';
+import { AuthView } from './components/AuthView';
 import { HistoryView } from './components/HistoryView';
 import { ResultPanel } from './components/ResultPanel';
 import { TopNav } from './components/TopNav';
 import { UploadSlot } from './components/UploadSlot';
 import { sendToWebhook, WebhookError } from './lib/api';
-import { addHistoryEntry } from './lib/historyDb';
+import { setUnauthorizedHandler } from './lib/apiClient';
+import { getCurrentUser, logout } from './lib/auth';
+import { assetFromHistory, fetchHistoryBlob } from './lib/history';
 import { createId } from './lib/id';
-import {
-  assetFromStored,
-  createImageAsset,
-  downloadBlob,
-  prepareUpload,
-  resultFilename,
-  storedFromAsset,
-} from './lib/image';
+import { createImageAsset, downloadBlob, prepareUpload, resultFilename } from './lib/image';
 import { loadSamples } from './lib/samples';
-import type { HistoryEntry, ImageAsset, RequestState, SlotKey, UploadFormat, View } from './types';
+import type { AuthUser, HistoryEntry, ImageAsset, RequestState, SlotKey, UploadFormat, View } from './types';
 
 type SlotRecord<T> = Record<SlotKey, T>;
 
@@ -34,6 +31,8 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export default function App() {
+  /** undefined = wird geprüft, null = abgemeldet. */
+  const [user, setUser] = useState<AuthUser | null | undefined>(undefined);
   const [view, setView] = useState<View>('studio');
 
   const [assets, setAssets] = useState<SlotRecord<ImageAsset | null>>({ image1: null, image2: null });
@@ -152,19 +151,8 @@ export default function App() {
         },
       });
 
-      const entry: HistoryEntry = {
-        id: createId(),
-        createdAt,
-        durationMs: response.durationMs,
-        uploadFormat: format,
-        source: response.source,
-        image1: storedFromAsset(image1),
-        image2: storedFromAsset(image2),
-        output: storedFromAsset(output),
-      };
-      addHistoryEntry(entry)
-        .then(() => setHistoryRevision((value) => value + 1))
-        .catch((error: unknown) => console.warn('Verlauf konnte nicht gespeichert werden:', error));
+      // Der Server speichert erfolgreiche Generierungen selbst im Cloud-Verlauf (Supabase).
+      if (response.historySaved) setHistoryRevision((value) => value + 1);
     } catch (error) {
       if (!isCurrent()) return;
       const failure =
@@ -182,11 +170,49 @@ export default function App() {
   // Laufende Anfrage beim Schließen abbrechen.
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // ---------- Anmeldung ----------
+
+  /** Setzt das Studio zurück, damit nach dem Abmelden keine Bilder des vorherigen Kontos sichtbar bleiben. */
+  const resetSession = useCallback(() => {
+    abortRef.current?.abort();
+    requestIdRef.current += 1;
+    setAssets({ image1: null, image2: null });
+    setSlotErrors({ image1: null, image2: null });
+    setRequest({ status: 'idle' });
+    setView('studio');
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentUser()
+      .then((current) => !cancelled && setUser(current))
+      .catch(() => !cancelled && setUser(null));
+    // Server meldet 401 => Session abgelaufen, zurück zur Anmeldung.
+    setUnauthorizedHandler(() => {
+      setUser(null);
+      resetSession();
+    });
+    return () => {
+      cancelled = true;
+      setUnauthorizedHandler(null);
+    };
+  }, [resetSession]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.warn('Abmelden fehlgeschlagen:', error);
+    }
+    setUser(null);
+    resetSession();
+  };
+
   // ---------- Tastatur & Zwischenablage ----------
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (view !== 'studio') return;
+      if (view !== 'studio' || !user) return;
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && canSend) {
         event.preventDefault();
         void send();
@@ -194,7 +220,7 @@ export default function App() {
     };
 
     const onPaste = (event: ClipboardEvent) => {
-      if (view !== 'studio' || isEditableTarget(event.target)) return;
+      if (view !== 'studio' || !user || isEditableTarget(event.target)) return;
       const file = Array.from(event.clipboardData?.files ?? []).find((item) => item.type.startsWith('image/'));
       if (!file) return;
       event.preventDefault();
@@ -208,7 +234,7 @@ export default function App() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('paste', onPaste);
     };
-  }, [view, canSend, send, handleFile, activeSlot]);
+  }, [view, user, canSend, send, handleFile, activeSlot]);
 
   // ---------- Ergebnis & Verlauf ----------
 
@@ -218,15 +244,21 @@ export default function App() {
     setSlot('image1', { ...output, id: createId() });
   };
 
-  const handleRestore = (entry: HistoryEntry) => {
-    const image1 = assetFromStored(entry.image1);
-    const image2 = assetFromStored(entry.image2);
+  /** Lädt die Bilder eines Verlaufseintrags vom Server und stellt sie im Studio wieder her. */
+  const handleRestore = async (entry: HistoryEntry) => {
+    const [image1, image2, output] = await Promise.all([
+      assetFromHistory(entry.image1),
+      assetFromHistory(entry.image2),
+      assetFromHistory(entry.output),
+    ]);
+    abortRef.current?.abort();
+    requestIdRef.current += 1;
     setAssets({ image1, image2 });
     setSlotErrors({ image1: null, image2: null });
     setRequest({
       status: 'success',
       result: {
-        output: assetFromStored(entry.output),
+        output: { ...output, name: resultFilename(output.type, entry.createdAt) },
         inputs: { image1, image2 },
         durationMs: entry.durationMs,
         source: entry.source,
@@ -235,15 +267,31 @@ export default function App() {
     setView('studio');
   };
 
-  const handleDownloadEntry = (entry: HistoryEntry) =>
-    downloadBlob(entry.output.blob, resultFilename(entry.output.type, entry.createdAt));
+  const handleDownloadEntry = async (entry: HistoryEntry) => {
+    downloadBlob(await fetchHistoryBlob(entry.output), resultFilename(entry.output.type, entry.createdAt));
+  };
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <TopNav view={view} onViewChange={setView} onLoadSamples={handleLoadSamples} loadingSamples={loadingSamples} />
+      <TopNav
+        user={user ?? null}
+        view={view}
+        onViewChange={setView}
+        onLoadSamples={handleLoadSamples}
+        loadingSamples={loadingSamples}
+        onLogout={() => void handleLogout()}
+      />
 
       <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 sm:py-8">
-        {view === 'studio' && (
+        {user === undefined && (
+          <div className="flex justify-center pt-24">
+            <LoaderCircle className="size-6 animate-spin text-muted" aria-label="Anmeldung wird geprüft" />
+          </div>
+        )}
+
+        {user === null && <AuthView onAuthenticated={setUser} />}
+
+        {user && view === 'studio' && (
           <div className="mx-auto flex max-w-[820px] flex-col gap-8 pt-4 sm:pt-8">
             <header className="text-center">
               <h1 className="font-display text-3xl font-bold tracking-tight sm:text-[2.5rem]">KI-Bild-Generator</h1>
@@ -299,7 +347,7 @@ export default function App() {
           </div>
         )}
 
-        {view === 'history' && (
+        {user && view === 'history' && (
           <HistoryView revision={historyRevision} onRestore={handleRestore} onDownload={handleDownloadEntry} />
         )}
 

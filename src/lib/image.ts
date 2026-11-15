@@ -1,5 +1,5 @@
 import { MAX_UPLOAD_BYTES } from '../config';
-import type { ImageAsset, StoredImage, UploadFormat } from '../types';
+import type { ImageAsset, UploadFormat } from '../types';
 import { formatBytes } from './format';
 import { createId } from './id';
 
@@ -92,21 +92,6 @@ export async function createImageAsset(blob: Blob, name: string): Promise<ImageA
     size: blob.size,
     width: size.width,
     height: size.height,
-  };
-}
-
-export function assetFromStored(stored: StoredImage): ImageAsset {
-  return { id: createId(), ...stored };
-}
-
-export function storedFromAsset(asset: ImageAsset): StoredImage {
-  return {
-    blob: asset.blob,
-    name: asset.name,
-    type: asset.type,
-    size: asset.size,
-    width: asset.width,
-    height: asset.height,
   };
 }
 

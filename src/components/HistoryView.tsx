@@ -1,22 +1,24 @@
 import { Download, LoaderCircle, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useObjectUrl } from '../hooks/useObjectUrl';
 import { formatDate, formatSeconds } from '../lib/format';
-import { deleteHistoryEntry, listHistoryEntries } from '../lib/historyDb';
-import type { HistoryEntry, StoredImage } from '../types';
+import { messageOf } from '../lib/apiClient';
+import { deleteHistoryEntry, listHistoryEntries } from '../lib/history';
+import type { HistoryEntry, HistoryImage } from '../types';
 import { ImageMeta } from './ImageMeta';
 
 interface HistoryViewProps {
   /** Wird nach jeder neuen Generierung erhöht, um die Liste neu zu laden. */
   revision: number;
-  onRestore: (entry: HistoryEntry) => void;
-  onDownload: (entry: HistoryEntry) => void;
+  onRestore: (entry: HistoryEntry) => Promise<void>;
+  onDownload: (entry: HistoryEntry) => Promise<void>;
 }
+
 
 export function HistoryView({ revision, onRestore, onDownload }: HistoryViewProps) {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -24,7 +26,7 @@ export function HistoryView({ revision, onRestore, onDownload }: HistoryViewProp
       setError(null);
     } catch (loadError) {
       setEntries([]);
-      setError(loadError instanceof Error ? loadError.message : 'Der Verlauf konnte nicht geladen werden.');
+      setError(messageOf(loadError, 'Der Verlauf konnte nicht geladen werden.'));
     }
   }, []);
 
@@ -40,14 +42,29 @@ export function HistoryView({ revision, onRestore, onDownload }: HistoryViewProp
     );
   }, [entries, query]);
 
-  const handleDelete = async (id: string) => {
+  /** Führt eine Aktion für einen Eintrag aus und sperrt dessen Buttons solange. */
+  const runFor = async (id: string, action: () => Promise<void>, fallback: string) => {
+    setBusyId(id);
+    setError(null);
     try {
-      await deleteHistoryEntry(id);
-      setEntries((current) => current?.filter((entry) => entry.id !== id) ?? null);
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Eintrag konnte nicht gelöscht werden.');
+      await action();
+    } catch (actionError) {
+      setError(messageOf(actionError, fallback));
+    } finally {
+      setBusyId((current) => (current === id ? null : current));
     }
   };
+
+  const handleDelete = (id: string) =>
+    runFor(
+      id,
+      async () => {
+        if (!window.confirm('Diesen Eintrag endgültig löschen?')) return;
+        await deleteHistoryEntry(id);
+        setEntries((current) => current?.filter((entry) => entry.id !== id) ?? null);
+      },
+      'Eintrag konnte nicht gelöscht werden.',
+    );
 
   return (
     <div className="flex flex-col gap-4">
@@ -57,7 +74,7 @@ export function HistoryView({ revision, onRestore, onDownload }: HistoryViewProp
           <p className="meta mt-0.5">
             {entries ? `${entries.length} ${entries.length === 1 ? 'Generierung' : 'Generierungen'}` : 'Wird geladen …'}
             <span className="px-1.5 text-subtle">·</span>
-            nur lokal in diesem Browser gespeichert
+            in deinem Konto gespeichert
           </p>
         </div>
         <label className="relative w-full sm:w-72">
@@ -98,8 +115,9 @@ export function HistoryView({ revision, onRestore, onDownload }: HistoryViewProp
             <HistoryCard
               key={entry.id}
               entry={entry}
-              onRestore={() => onRestore(entry)}
-              onDownload={() => onDownload(entry)}
+              busy={busyId === entry.id}
+              onRestore={() => void runFor(entry.id, () => onRestore(entry), 'Eintrag konnte nicht geladen werden.')}
+              onDownload={() => void runFor(entry.id, () => onDownload(entry), 'Download fehlgeschlagen.')}
               onDelete={() => void handleDelete(entry.id)}
             />
           ))}
@@ -109,11 +127,10 @@ export function HistoryView({ revision, onRestore, onDownload }: HistoryViewProp
   );
 }
 
-function Thumb({ image, label, large = false }: { image: StoredImage; label: string; large?: boolean }) {
-  const url = useObjectUrl(image.blob);
+function Thumb({ image, label, large = false }: { image: HistoryImage; label: string; large?: boolean }) {
   return (
     <div className={`relative overflow-hidden bg-canvas ${large ? 'col-span-2 row-span-2' : ''}`}>
-      {url && <img src={url} alt={`${label}: ${image.name}`} className="size-full object-contain" loading="lazy" />}
+      <img src={image.url} alt={`${label}: ${image.name}`} className="size-full object-contain" loading="lazy" />
       <span className="absolute bottom-1 left-1 rounded bg-canvas/80 px-1 font-mono text-[10px] text-muted">{label}</span>
     </div>
   );
@@ -121,11 +138,13 @@ function Thumb({ image, label, large = false }: { image: StoredImage; label: str
 
 function HistoryCard({
   entry,
+  busy,
   onRestore,
   onDownload,
   onDelete,
 }: {
   entry: HistoryEntry;
+  busy: boolean;
   onRestore: () => void;
   onDownload: () => void;
   onDelete: () => void;
@@ -149,11 +168,15 @@ function HistoryCard({
         <ImageMeta asset={entry.output} />
       </div>
       <div className="flex gap-1 border-t border-line px-2 py-2">
-        <button type="button" className="btn-ghost h-8 px-2.5" onClick={onRestore}>
-          <RotateCcw className="size-4" aria-hidden />
+        <button type="button" className="btn-ghost h-8 px-2.5" onClick={onRestore} disabled={busy}>
+          {busy ? (
+            <LoaderCircle className="size-4 animate-spin" aria-hidden />
+          ) : (
+            <RotateCcw className="size-4" aria-hidden />
+          )}
           Wiederherstellen
         </button>
-        <button type="button" className="btn-ghost h-8 px-2.5" onClick={onDownload}>
+        <button type="button" className="btn-ghost h-8 px-2.5" onClick={onDownload} disabled={busy}>
           <Download className="size-4" aria-hidden />
           Download
         </button>
@@ -161,6 +184,7 @@ function HistoryCard({
           type="button"
           className="btn-ghost ml-auto h-8 px-2.5 hover:text-danger"
           onClick={onDelete}
+          disabled={busy}
           aria-label="Eintrag löschen"
         >
           <Trash2 className="size-4" aria-hidden />

@@ -1,4 +1,5 @@
 import { PROXY_ENDPOINT } from '../config';
+import { notifyUnauthorized } from './apiClient';
 import type { ProxyErrorBody, RequestFailure, ResultSource } from '../types';
 import type { PreparedUpload } from './image';
 
@@ -17,6 +18,8 @@ export interface WebhookResponse {
   mime: string;
   durationMs: number;
   source: ResultSource;
+  /** true, wenn der Server das Ergebnis im Cloud-Verlauf gespeichert hat. */
+  historySaved: boolean;
 }
 
 interface SendOptions {
@@ -55,6 +58,8 @@ export async function sendToWebhook({ image1, image2, signal }: SendOptions): Pr
   const contentType = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
 
   if (!response.ok) {
+    // 401 kommt vom eigenen Server (nicht von n8n – dessen Fehler werden als 502 gemeldet).
+    if (response.status === 401) notifyUnauthorized();
     const text = await response.text().catch(() => '');
     let body: unknown;
     try {
@@ -94,5 +99,6 @@ export async function sendToWebhook({ image1, image2, signal }: SendOptions): Pr
     mime: contentType,
     durationMs: Number.isFinite(headerDuration) && headerDuration > 0 ? headerDuration : performance.now() - startedAt,
     source: headerSource && SOURCES.includes(headerSource) ? headerSource : 'binary',
+    historySaved: response.headers.get('x-history-saved') === '1',
   };
 }

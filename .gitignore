@@ -1,5 +1,12 @@
 node_modules
 dist
 .env
+.env.*
+!.env.example
 Screenshot*.png
 *.log
+.mcp.json
+# Supabase: Zugangsdaten und lokale CLI-Dateien nie committen
+supabase/.temp
+supabase/.branches
+supabase/.env

@@ -10,7 +10,12 @@ interface ImageMetaProps {
 
 /** Metadaten als reiner Text mit „·“-Trennern. */
 export function ImageMeta({ asset, extra = [], className = '' }: ImageMetaProps) {
-  const parts = [labelForMime(asset.type), formatResolution(asset.width, asset.height), formatBytes(asset.size), ...extra];
+  const parts = [
+    labelForMime(asset.type),
+    ...(asset.width > 0 && asset.height > 0 ? [formatResolution(asset.width, asset.height)] : []),
+    formatBytes(asset.size),
+    ...extra,
+  ];
   return (
     <p className={`meta truncate ${className}`}>
       {parts.map((part, index) => (

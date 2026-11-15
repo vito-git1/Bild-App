@@ -7,6 +7,17 @@ import multer from 'multer';
 import { fetch, FormData, type Response as UndiciResponse } from 'undici';
 import { findImageInJson, sniffImageMime, type ImagePayload } from './imageResponse.js';
 import { findValidationError, guardedAgent, parseWebhookUrl, UrlValidationError } from './ssrf.js';
+import { createAuth, currentUser, sameOriginGuard } from './auth.js';
+import { ProxyError, type ProxyErrorBody } from './errors.js';
+import {
+  deleteGeneration,
+  getGenerationImage,
+  historyEnabled,
+  isHistoryId,
+  isHistoryImageKind,
+  listGenerations,
+  saveGeneration,
+} from './history.js';
 
 // .env laden, falls vorhanden (lokal). Auf Vercel kommen die Werte aus den Environment Variables.
 try {
@@ -35,25 +46,6 @@ const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_RESPONSE_BYTES = 60 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 120_000;
 const MAX_ERROR_BODY_CHARS = 8_000;
-
-interface ProxyErrorBody {
-  error: string;
-  upstreamStatus?: number;
-  upstreamContentType?: string;
-  upstreamBody?: string;
-  hint?: string;
-}
-
-class ProxyError extends Error {
-  readonly statusCode: number;
-  readonly details: Omit<ProxyErrorBody, 'error'>;
-
-  constructor(statusCode: number, message: string, details: Omit<ProxyErrorBody, 'error'> = {}) {
-    super(message);
-    this.statusCode = statusCode;
-    this.details = details;
-  }
-}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -101,12 +93,18 @@ app.use((_req, res, next) => {
   next();
 });
 
+// Verändernde API-Anfragen nur von der eigenen Seite (CSRF-Schutz für die Session-Cookies).
+app.use('/api', sameOriginGuard);
+
+const { router: authRouter, requireUser } = createAuth(IS_PROD);
+app.use('/api/auth', authRouter);
+
 const requestLog = new Map<string, number[]>();
 let activeGenerations = 0;
 
-/** Einfache In-Memory-Drosselung für den kostenpflichtigen Endpunkt. */
-function rateLimit(req: Request, _res: Response, next: NextFunction) {
-  const key = req.ip ?? 'unbekannt';
+/** Einfache In-Memory-Drosselung für den kostenpflichtigen Endpunkt (pro Nutzer). */
+function rateLimit(req: Request, res: Response, next: NextFunction) {
+  const key = res.locals.user?.id ?? req.ip ?? 'unbekannt';
   const now = Date.now();
   const recent = (requestLog.get(key) ?? []).filter((time) => now - time < 60_000);
   if (recent.length >= RATE_LIMIT_PER_MINUTE) {
@@ -130,6 +128,7 @@ app.get('/api/health', (_req, res) => {
 
 app.post(
   '/api/webhook',
+  requireUser,
   rateLimit,
   upload.fields([
     { name: 'image1', maxCount: 1 },
@@ -187,13 +186,18 @@ app.post(
       const payload = await readImagePayload(upstream, signal, timeoutSignal);
       if (clientAbort.signal.aborted) return;
 
+      const durationMs = Math.round(performance.now() - startedAt);
+      const historySaved = await saveToHistory(currentUser(res).id, image1, image2, payload, durationMs);
+      if (clientAbort.signal.aborted) return;
+
       res
         .status(200)
         .set({
           'Content-Type': payload.mime,
           'Content-Length': String(payload.buffer.length),
-          'X-Processing-Time-Ms': String(Math.round(performance.now() - startedAt)),
+          'X-Processing-Time-Ms': String(durationMs),
           'X-Result-Source': payload.source,
+          'X-History-Saved': historySaved ? '1' : '0',
           'Cache-Control': 'no-store',
           'Content-Security-Policy': "default-src 'none'; sandbox",
         })
@@ -205,6 +209,94 @@ app.post(
     }
   },
 );
+
+/** Speichert eine erfolgreiche Generierung im Cloud-Verlauf. Fehler brechen die Antwort nicht ab. */
+async function saveToHistory(
+  userId: string,
+  image1: Express.Multer.File,
+  image2: Express.Multer.File,
+  payload: ImagePayload,
+  durationMs: number,
+): Promise<boolean> {
+  if (!historyEnabled()) return false;
+  // Nur echte Rasterbilder speichern, da sie später wieder an Browser ausgeliefert werden.
+  const mime1 = sniffImageMime(image1.buffer);
+  const mime2 = sniffImageMime(image2.buffer);
+  if (!mime1 || !mime2) return false;
+  try {
+    await saveGeneration(userId, {
+      image1: { buffer: image1.buffer, mime: mime1, name: image1.originalname || 'image1' },
+      image2: { buffer: image2.buffer, mime: mime2, name: image2.originalname || 'image2' },
+      output: { buffer: payload.buffer, mime: payload.mime, name: 'ergebnis' },
+      durationMs,
+      source: payload.source,
+    });
+    return true;
+  } catch (error) {
+    console.warn('[kleiderstudio] Verlauf konnte nicht gespeichert werden:', (error as Error).message);
+    return false;
+  }
+}
+
+function requireHistory(_req: Request, _res: Response, next: NextFunction) {
+  if (!historyEnabled()) {
+    next(
+      new ProxyError(503, 'Der Cloud-Verlauf ist nicht eingerichtet.', {
+        hint: 'SUPABASE_URL und SUPABASE_SECRET_KEY in der .env (bzw. als Vercel Environment Variables) setzen.',
+      }),
+    );
+    return;
+  }
+  next();
+}
+
+app.get('/api/history', requireHistory, requireUser, async (_req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store').json({ entries: await listGenerations(currentUser(res).id) });
+  } catch (error) {
+    next(new ProxyError(502, (error as Error).message));
+  }
+});
+
+app.get('/api/history/:id/:kind', requireHistory, requireUser, async (req, res, next) => {
+  const { id, kind } = req.params as { id: string; kind: string };
+  if (!isHistoryId(id) || !isHistoryImageKind(kind)) {
+    next(new ProxyError(404, 'Bild nicht gefunden.'));
+    return;
+  }
+  try {
+    const image = await getGenerationImage(currentUser(res).id, id, kind);
+    if (!image) throw new ProxyError(404, 'Bild nicht gefunden.');
+    res
+      .status(200)
+      .set({
+        'Content-Type': image.mime,
+        'Content-Length': String(image.buffer.length),
+        // Bilder eines Eintrags ändern sich nie.
+        'Cache-Control': 'private, max-age=86400, immutable',
+        Vary: 'Cookie',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+      })
+      .end(image.buffer);
+  } catch (error) {
+    next(error instanceof ProxyError ? error : new ProxyError(502, (error as Error).message));
+  }
+});
+
+app.delete('/api/history/:id', requireHistory, requireUser, async (req, res, next) => {
+  const { id } = req.params as { id: string };
+  if (!isHistoryId(id)) {
+    next(new ProxyError(404, 'Eintrag nicht gefunden.'));
+    return;
+  }
+  try {
+    const deleted = await deleteGeneration(currentUser(res).id, id);
+    if (!deleted) throw new ProxyError(404, 'Eintrag nicht gefunden.');
+    res.status(204).end();
+  } catch (error) {
+    next(error instanceof ProxyError ? error : new ProxyError(502, (error as Error).message));
+  }
+});
 
 function toBlob(file: Express.Multer.File): Blob {
   return new Blob([new Uint8Array(file.buffer)], { type: file.mimetype || 'application/octet-stream' });

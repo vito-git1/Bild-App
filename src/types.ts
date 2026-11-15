@@ -40,26 +40,34 @@ export type RequestState =
   | { status: 'error'; failure: RequestFailure }
   | { status: 'success'; result: GenerationResult };
 
-export interface StoredImage {
-  blob: Blob;
+/** Bild eines Verlaufseintrags; wird über den Server aus Supabase geladen. */
+export interface HistoryImage {
+  /** Same-Origin-URL, z. B. /api/history/<id>/output */
+  url: string;
   name: string;
   type: string;
   size: number;
+  /** 0, falls die Abmessungen nicht ermittelt werden konnten. */
   width: number;
   height: number;
 }
 
+/** Eintrag im Cloud-Verlauf. Muss zu HistoryEntryDto in server/history.ts passen. */
 export interface HistoryEntry {
   id: string;
   createdAt: number;
   durationMs: number;
-  /** Nur in älteren Einträgen vorhanden. */
-  webhookUrl?: string;
-  uploadFormat: UploadFormat;
   source: ResultSource;
-  image1: StoredImage;
-  image2: StoredImage;
-  output: StoredImage;
+  image1: HistoryImage;
+  image2: HistoryImage;
+  output: HistoryImage;
+}
+
+/** Angemeldeter Nutzer. Muss zu AuthUser in server/auth.ts passen. */
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
 }
 
 /** Fehlerformat des Express-Proxys. */
