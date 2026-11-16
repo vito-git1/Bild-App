@@ -54,9 +54,9 @@ export default function App() {
 
   // ---------- Guthaben ----------
 
-  const refreshBilling = useCallback(async () => {
+  const refreshBilling = useCallback(async (session?: string) => {
     try {
-      const info = await getBilling();
+      const info = await getBilling(session);
       setBilling(info);
       return info;
     } catch {
@@ -72,27 +72,31 @@ export default function App() {
     // Rückkehr von Stripe (?kauf=ok / ?kauf=abbruch): Hinweis zeigen und die URL aufräumen.
     const params = new URLSearchParams(window.location.search);
     const purchase = params.get('kauf');
+    const session = params.get('session') ?? undefined;
     if (purchase) window.history.replaceState(null, '', window.location.pathname);
 
-    void refreshBilling().then(async (initial) => {
+    void (async () => {
       if (purchase === 'abbruch') {
+        await refreshBilling();
         setBillingNotice('Kauf abgebrochen – es wurde nichts berechnet.');
         return;
       }
-      if (purchase !== 'ok') return;
+      if (purchase !== 'ok' || !session) {
+        await refreshBilling();
+        return;
+      }
       setBillingNotice('Danke für deinen Kauf! Dein Guthaben wird gutgeschrieben …');
-      // Stripe meldet die Zahlung per Webhook – das kann ein paar Sekunden dauern.
-      const before = initial?.credits ?? 0;
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 2000));
-        const info = await refreshBilling();
-        if (info && info.credits > before) {
+      // Stripe meldet die Zahlung per Webhook – das kann ein paar Sekunden dauern (oder ist schon passiert).
+      for (let attempt = 0; attempt < 15; attempt += 1) {
+        const info = await refreshBilling(session);
+        if (info?.purchaseGranted) {
           setBillingNotice(`Danke für deinen Kauf! Du hast jetzt ${info.credits} Bilder.`);
           return;
         }
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
       }
       setBillingNotice('Danke für deinen Kauf! Die Gutschrift kann noch einen Moment dauern – lade die Seite gleich neu.');
-    });
+    })();
   }, [user, refreshBilling]);
 
   const handleBuy = async () => {

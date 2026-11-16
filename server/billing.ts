@@ -76,11 +76,25 @@ function originOf(req: Request): string {
 export function createBilling(requireUser: (req: Request, res: Response, next: NextFunction) => void) {
   const router = express.Router();
 
-  /** Aktuelles Guthaben und das Kaufangebot. */
-  router.get('/', requireUser, async (_req, res, next) => {
+  /** Aktuelles Guthaben und das Kaufangebot; mit ?session=cs_… zusätzlich, ob dieser Kauf schon gutgeschrieben ist. */
+  router.get('/', requireUser, async (req, res, next) => {
     try {
+      const userId = currentUser(res).id;
+      const session = typeof req.query.session === 'string' ? req.query.session : '';
+      let purchaseGranted: boolean | undefined;
+      if (/^cs_[A-Za-z0-9_]{10,200}$/.test(session)) {
+        const { data, error } = await getClient()
+          .from('credit_purchases')
+          .select('stripe_session_id')
+          .eq('stripe_session_id', session)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (error) throw new ProxyError(502, 'Der Kauf konnte nicht geprüft werden.');
+        purchaseGranted = Boolean(data);
+      }
       res.set('Cache-Control', 'no-store').json({
-        credits: await getCredits(currentUser(res).id),
+        credits: await getCredits(userId),
+        purchaseGranted,
         purchaseEnabled: Boolean(stripeKeys().secret && stripeKeys().webhookSecret),
         pack: { credits: PACK_CREDITS, priceCents: PACK_PRICE_CENTS, currency: CURRENCY },
       });
@@ -109,7 +123,8 @@ export function createBilling(requireUser: (req: Request, res: Response, next: N
         client_reference_id: user.id,
         customer_email: user.email || undefined,
         metadata: { user_id: user.id, credits: String(PACK_CREDITS) },
-        success_url: `${origin}/?kauf=ok`,
+        // {CHECKOUT_SESSION_ID} ersetzt Stripe selbst; die App fragt damit nach, ob genau dieser Kauf gebucht ist.
+        success_url: `${origin}/?kauf=ok&session={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/?kauf=abbruch`,
       });
       if (!session.url) throw new ProxyError(502, 'Die Bezahlseite konnte nicht erstellt werden.');

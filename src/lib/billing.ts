@@ -6,10 +6,13 @@ export interface BillingInfo {
   credits: number;
   purchaseEnabled: boolean;
   pack: { credits: number; priceCents: number; currency: string };
+  /** Nur bei Abfrage mit Session-ID: true, wenn dieser Kauf schon gutgeschrieben ist. */
+  purchaseGranted?: boolean;
 }
 
-export async function getBilling(): Promise<BillingInfo> {
-  const response = await request(BILLING_ENDPOINT, { headers: { Accept: 'application/json' } });
+export async function getBilling(session?: string): Promise<BillingInfo> {
+  const url = session ? `${BILLING_ENDPOINT}?session=${encodeURIComponent(session)}` : BILLING_ENDPOINT;
+  const response = await request(url, { headers: { Accept: 'application/json' } });
   if (!response.ok) throw await toApiError(response, 'Das Guthaben konnte nicht geladen werden.');
   return (await response.json()) as BillingInfo;
 }
