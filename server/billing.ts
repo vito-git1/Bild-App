@@ -11,8 +11,8 @@ import { currentUser } from './auth.js';
 import { ProxyError } from './errors.js';
 import { getClient, historyEnabled } from './history.js';
 
-const PACK_CREDITS = positiveInt(process.env.CREDIT_PACK_SIZE, 20);
-const PACK_PRICE_CENTS = positiveInt(process.env.CREDIT_PACK_PRICE_CENTS, 499);
+const PACK_CREDITS = positiveInt(process.env.CREDIT_PACK_SIZE, 25);
+const PACK_PRICE_CENTS = positiveInt(process.env.CREDIT_PACK_PRICE_CENTS, 999);
 const CURRENCY = 'eur';
 
 function positiveInt(raw: string | undefined, fallback: number): number {
