@@ -44,7 +44,7 @@ const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT ?? 3);
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_RESPONSE_BYTES = 60 * 1024 * 1024;
-const UPSTREAM_TIMEOUT_MS = 120_000;
+const UPSTREAM_TIMEOUT_MS = 240_000;
 const MAX_ERROR_BODY_CHARS = 8_000;
 
 const upload = multer({

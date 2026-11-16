@@ -151,8 +151,8 @@ const guardedConnector: buildConnector.connector = (options, callback) => {
 
 export const guardedAgent = new Agent({
   connect: guardedConnector,
-  headersTimeout: 125_000,
-  bodyTimeout: 125_000,
+  headersTimeout: 245_000,
+  bodyTimeout: 245_000,
 });
 
 /** Liefert eine UrlValidationError aus einer fetch-Fehlerkette, falls vorhanden. */
