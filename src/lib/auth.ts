@@ -36,6 +36,20 @@ export async function login(input: { email: string; password: string }): Promise
   return body.user;
 }
 
+/** Fordert die E-Mail zum Zurücksetzen des Passworts an (Antwort ist immer neutral). */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const response = await postJson('forgot', { email });
+  if (!response.ok) throw await toApiError(response, 'Die E-Mail konnte nicht verschickt werden.');
+}
+
+/** Setzt mit dem Token aus dem Link ein neues Passwort; meldet danach direkt an (falls möglich). */
+export async function resetPassword(input: { accessToken: string; password: string }): Promise<AuthUser | null> {
+  const response = await postJson('reset', input);
+  if (!response.ok) throw await toApiError(response, 'Das Passwort konnte nicht geändert werden.');
+  const body = (await response.json()) as { user: AuthUser | null };
+  return body.user;
+}
+
 export async function logout(): Promise<void> {
   const response = await postJson('logout');
   if (!response.ok) throw await toApiError(response, 'Abmelden fehlgeschlagen.');

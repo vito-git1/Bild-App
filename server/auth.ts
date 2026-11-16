@@ -82,6 +82,34 @@ function readString(body: unknown, key: string): string {
   return typeof value === 'string' ? value : '';
 }
 
+function validatePassword(password: string) {
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    throw badRequest(`Das Passwort muss mindestens ${MIN_PASSWORD_LENGTH} Zeichen lang sein.`);
+  }
+  if (Buffer.byteLength(password) > MAX_PASSWORD_LENGTH) {
+    throw badRequest(`Das Passwort darf höchstens ${MAX_PASSWORD_LENGTH} Zeichen lang sein.`);
+  }
+}
+
+/**
+ * Stammt das (bereits per getUser geprüfte) Token aus einem E-Mail-Link? Normale Logins haben
+ * amr = password; nur Link-Sessions dürfen ohne altes Passwort ein neues setzen.
+ */
+function isEmailLinkToken(accessToken: string): boolean {
+  try {
+    const payload = JSON.parse(Buffer.from(accessToken.split('.')[1] ?? '', 'base64url').toString('utf8')) as {
+      amr?: Array<{ method?: string }>;
+    };
+    return (payload.amr ?? []).some((entry) => ['recovery', 'otp', 'magiclink'].includes(entry.method ?? ''));
+  } catch {
+    return false;
+  }
+}
+
+function originOf(req: Request): string {
+  return `${req.protocol}://${req.get('host')}`;
+}
+
 export function createAuth(isProd: boolean) {
   const cookieBase: CookieOptions = { httpOnly: true, sameSite: 'lax', secure: isProd, path: '/api' };
 
@@ -177,17 +205,12 @@ export function createAuth(isProd: boolean) {
       if (!name) throw badRequest('Bitte gib deinen Namen ein.');
       if (name.length > MAX_NAME_LENGTH) throw badRequest(`Der Name darf höchstens ${MAX_NAME_LENGTH} Zeichen lang sein.`);
       if (!EMAIL_PATTERN.test(email)) throw badRequest('Bitte gib eine gültige E-Mail-Adresse ein.');
-      if (password.length < MIN_PASSWORD_LENGTH) {
-        throw badRequest(`Das Passwort muss mindestens ${MIN_PASSWORD_LENGTH} Zeichen lang sein.`);
-      }
-      if (Buffer.byteLength(password) > MAX_PASSWORD_LENGTH) {
-        throw badRequest(`Das Passwort darf höchstens ${MAX_PASSWORD_LENGTH} Zeichen lang sein.`);
-      }
+      validatePassword(password);
 
       const { data, error } = await createAuthClient().auth.signUp({
         email,
         password,
-        options: { data: { name }, emailRedirectTo: `${req.protocol}://${req.get('host')}/?bestaetigt=1` },
+        options: { data: { name }, emailRedirectTo: `${originOf(req)}/?bestaetigt=1` },
       });
 
       if (error) {
@@ -234,6 +257,79 @@ export function createAuth(isProd: boolean) {
         throw new ProxyError(400, 'E-Mail oder Passwort ist falsch.');
       }
 
+      setSession(res, data.session);
+      res.json({ user: toAuthUser(data.user) });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /** Schickt eine E-Mail mit Link zum Zurücksetzen. Antwortet immer neutral (keine Adress-Abfrage möglich). */
+  router.post('/forgot', limitAttempts, async (req, res, next) => {
+    try {
+      const email = readString(req.body, 'email').trim().toLowerCase();
+      if (!EMAIL_PATTERN.test(email)) throw badRequest('Bitte gib eine gültige E-Mail-Adresse ein.');
+
+      const { error } = await createAuthClient().auth.resetPasswordForEmail(email, {
+        redirectTo: `${originOf(req)}/`,
+      });
+      if (error) {
+        if (error.code === 'over_email_send_rate_limit' || error.status === 429) {
+          throw new ProxyError(429, 'Gerade werden zu viele E-Mails verschickt. Bitte später erneut versuchen.');
+        }
+        if (isOutage(error)) throw new ProxyError(502, 'Die Anmeldung ist gerade nicht erreichbar.');
+        console.warn('[kleiderstudio] Passwort-Mail fehlgeschlagen:', error.code ?? error.message);
+      }
+      res.json({ sent: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
+   * Setzt nach dem Link aus der Passwort-Mail ein neues Passwort. Der Browser reicht das Token aus dem
+   * #fragment des Links einmalig durch; danach werden alle alten Sessions beendet und eine neue angelegt.
+   */
+  router.post('/reset', limitAttempts, async (req, res, next) => {
+    try {
+      const accessToken = readString(req.body, 'accessToken');
+      const password = readString(req.body, 'password');
+      if (!accessToken) throw badRequest('Der Link ist ungültig. Bitte fordere eine neue E-Mail an.');
+      validatePassword(password);
+
+      const client = createAuthClient();
+      const { data: userData, error: userError } = await client.auth.getUser(accessToken);
+      if (!userData.user?.email) {
+        if (userError && isOutage(userError)) throw new ProxyError(502, 'Die Anmeldung ist gerade nicht erreichbar.');
+        throw badRequest('Der Link ist abgelaufen. Bitte fordere eine neue E-Mail an.');
+      }
+      if (!isEmailLinkToken(accessToken)) {
+        throw badRequest('Der Link ist ungültig. Bitte fordere eine neue E-Mail an.');
+      }
+
+      const { error: updateError } = await client.auth.admin.updateUserById(userData.user.id, { password });
+      if (updateError) {
+        if (updateError.code === 'weak_password') {
+          throw badRequest('Das Passwort ist zu schwach. Bitte wähle ein längeres oder weniger gebräuchliches Passwort.');
+        }
+        if (updateError.code === 'same_password') {
+          throw badRequest('Das neue Passwort muss sich vom alten unterscheiden.');
+        }
+        if (isOutage(updateError)) throw new ProxyError(502, 'Die Anmeldung ist gerade nicht erreichbar.');
+        console.warn('[kleiderstudio] Passwort ändern fehlgeschlagen:', updateError.code ?? updateError.message);
+        throw badRequest('Das Passwort konnte nicht geändert werden.');
+      }
+
+      // Alle bisherigen Sessions (auch die aus dem Link) beenden, dann frisch anmelden.
+      await client.auth.admin.signOut(accessToken, 'global').catch(() => undefined);
+      const { data, error } = await createAuthClient().auth.signInWithPassword({
+        email: userData.user.email,
+        password,
+      });
+      if (error || !data.session || !data.user) {
+        res.json({ user: null });
+        return;
+      }
       setSession(res, data.session);
       res.json({ user: toAuthUser(data.user) });
     } catch (error) {
