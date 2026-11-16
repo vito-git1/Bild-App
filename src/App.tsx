@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
 import { ActionBar } from './components/ActionBar';
 import { AuthView } from './components/AuthView';
+import { CreditsBar } from './components/CreditsBar';
 import { HistoryView } from './components/HistoryView';
 import { ResultPanel } from './components/ResultPanel';
 import { TopNav } from './components/TopNav';
 import { UploadSlot } from './components/UploadSlot';
 import { sendToWebhook, WebhookError } from './lib/api';
-import { setUnauthorizedHandler } from './lib/apiClient';
+import { messageOf, setUnauthorizedHandler } from './lib/apiClient';
 import { getCurrentUser, logout } from './lib/auth';
+import { getBilling, startCheckout, type BillingInfo } from './lib/billing';
 import { assetFromHistory, fetchHistoryBlob } from './lib/history';
 import { createId } from './lib/id';
 import { createImageAsset, downloadBlob, prepareUpload, resultFilename } from './lib/image';
@@ -42,9 +44,67 @@ export default function App() {
   const [loadingSamples, setLoadingSamples] = useState(false);
   const [historyRevision, setHistoryRevision] = useState(0);
   const [request, setRequest] = useState<RequestState>({ status: 'idle' });
+  const [billing, setBilling] = useState<BillingInfo | null>(null);
+  const [buying, setBuying] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
+  const [billingNotice, setBillingNotice] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
+
+  // ---------- Guthaben ----------
+
+  const refreshBilling = useCallback(async () => {
+    try {
+      const info = await getBilling();
+      setBilling(info);
+      return info;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setBilling(null);
+      return;
+    }
+    // Rückkehr von Stripe (?kauf=ok / ?kauf=abbruch): Hinweis zeigen und die URL aufräumen.
+    const params = new URLSearchParams(window.location.search);
+    const purchase = params.get('kauf');
+    if (purchase) window.history.replaceState(null, '', window.location.pathname);
+
+    void refreshBilling().then(async (initial) => {
+      if (purchase === 'abbruch') {
+        setBillingNotice('Kauf abgebrochen – es wurde nichts berechnet.');
+        return;
+      }
+      if (purchase !== 'ok') return;
+      setBillingNotice('Danke für deinen Kauf! Dein Guthaben wird gutgeschrieben …');
+      // Stripe meldet die Zahlung per Webhook – das kann ein paar Sekunden dauern.
+      const before = initial?.credits ?? 0;
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+        const info = await refreshBilling();
+        if (info && info.credits > before) {
+          setBillingNotice(`Danke für deinen Kauf! Du hast jetzt ${info.credits} Bilder.`);
+          return;
+        }
+      }
+      setBillingNotice('Danke für deinen Kauf! Die Gutschrift kann noch einen Moment dauern – lade die Seite gleich neu.');
+    });
+  }, [user, refreshBilling]);
+
+  const handleBuy = async () => {
+    setBuying(true);
+    setBillingError(null);
+    try {
+      await startCheckout();
+    } catch (error) {
+      setBillingError(messageOf(error, 'Die Bezahlseite konnte nicht geöffnet werden.'));
+      setBuying(false);
+    }
+  };
 
   const sending = request.status === 'loading';
 
@@ -52,8 +112,9 @@ export default function App() {
     if (!assets.image1 && !assets.image2) return 'Bitte zwei Bilder hinzufügen.';
     if (!assets.image1) return 'Bitte ein Bild der Person hinzufügen.';
     if (!assets.image2) return 'Bitte ein Bild des Kleidungsstücks hinzufügen.';
+    if (billing && billing.credits <= 0) return 'Kein Guthaben mehr – bitte Guthaben kaufen.';
     return null;
-  }, [assets]);
+  }, [assets, billing]);
 
   const canSend = blockedReason === null && !sending;
 
@@ -162,8 +223,9 @@ export default function App() {
       setRequest({ status: 'error', failure });
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
+      void refreshBilling();
     }
-  }, [assets, blockedReason]);
+  }, [assets, blockedReason, refreshBilling]);
 
   const handleAbort = () => abortRef.current?.abort();
 
@@ -299,6 +361,15 @@ export default function App() {
                 Lade ein Personenbild und ein Kleidungsstück hoch, um ein neues Bild zu generieren
               </p>
             </header>
+
+            <CreditsBar
+              billing={billing}
+              buying={buying}
+              error={billingError}
+              notice={billingNotice}
+              onBuy={() => void handleBuy()}
+              onDismissNotice={() => setBillingNotice(null)}
+            />
 
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-6">

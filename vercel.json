@@ -6,7 +6,9 @@
   "rewrites": [
     { "source": "/api/history", "destination": "/api/webhook" },
     { "source": "/api/history/:path*", "destination": "/api/webhook" },
-    { "source": "/api/auth/:path*", "destination": "/api/webhook" }
+    { "source": "/api/auth/:path*", "destination": "/api/webhook" },
+    { "source": "/api/billing", "destination": "/api/webhook" },
+    { "source": "/api/billing/:path*", "destination": "/api/webhook" }
   ],
   "functions": {
     "api/webhook.ts": {

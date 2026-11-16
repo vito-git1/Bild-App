@@ -9,6 +9,7 @@ import { findImageInJson, sniffImageMime, type ImagePayload } from './imageRespo
 import { findValidationError, guardedAgent, parseWebhookUrl, UrlValidationError } from './ssrf.js';
 import { createAuth, currentUser, sameOriginGuard } from './auth.js';
 import { ProxyError, type ProxyErrorBody } from './errors.js';
+import { consumeCredit, createBilling, creditsEnabled, refundCredit } from './billing.js';
 import {
   deleteGeneration,
   getGenerationImage,
@@ -98,6 +99,7 @@ app.use('/api', sameOriginGuard);
 
 const { router: authRouter, requireUser } = createAuth(IS_PROD);
 app.use('/api/auth', authRouter);
+app.use('/api/billing', createBilling(requireUser));
 
 const requestLog = new Map<string, number[]>();
 let activeGenerations = 0;
@@ -146,6 +148,11 @@ app.post(
     };
     res.on('close', release);
 
+    // 1 Credit pro Generierung; schlägt sie fehl (oder bricht ab, bevor sie gespeichert ist), gibt es ihn zurück.
+    let chargedUserId: string | null = null;
+    let delivered = false;
+    let creditsLeft: number | null = null;
+
     try {
       const files = req.files as Record<string, Express.Multer.File[] | undefined> | undefined;
       const image1 = files?.image1?.[0];
@@ -155,6 +162,12 @@ app.post(
       }
 
       const target = parseWebhookUrl(WEBHOOK_URL);
+
+      if (creditsEnabled()) {
+        const userId = currentUser(res).id;
+        creditsLeft = await consumeCredit(userId);
+        chargedUserId = userId;
+      }
 
       const clientAbort = new AbortController();
       res.on('close', () => {
@@ -188,6 +201,8 @@ app.post(
 
       const durationMs = Math.round(performance.now() - startedAt);
       const historySaved = await saveToHistory(currentUser(res).id, image1, image2, payload, durationMs);
+      // Ab hier hat der Nutzer das Bild (spätestens im Verlauf) – der Credit bleibt verbraucht.
+      delivered = true;
       if (clientAbort.signal.aborted) return;
 
       res
@@ -198,6 +213,7 @@ app.post(
           'X-Processing-Time-Ms': String(durationMs),
           'X-Result-Source': payload.source,
           'X-History-Saved': historySaved ? '1' : '0',
+          ...(creditsLeft !== null ? { 'X-Credits-Remaining': String(creditsLeft) } : {}),
           'Cache-Control': 'no-store',
           'Content-Security-Policy': "default-src 'none'; sandbox",
         })
@@ -206,6 +222,7 @@ app.post(
       next(error);
     } finally {
       release();
+      if (chargedUserId && !delivered) await refundCredit(chargedUserId);
     }
   },
 );

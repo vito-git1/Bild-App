@@ -78,7 +78,8 @@ export function historyEnabled(): boolean {
   return Boolean(url && key);
 }
 
-function getClient(): SupabaseClient {
+/** Gemeinsamer Service-Client (Secret Key, umgeht RLS) – nur serverseitig, nie für Nutzer-Logins verwenden. */
+export function getClient(): SupabaseClient {
   if (!historyEnabled()) throw new Error('Supabase ist nicht konfiguriert (SUPABASE_URL / SUPABASE_SECRET_KEY).');
   const { url, key } = credentials();
   client ??= createClient(url, key, {
