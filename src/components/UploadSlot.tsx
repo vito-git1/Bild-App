@@ -1,4 +1,4 @@
-import { ImagePlus, LoaderCircle } from 'lucide-react';
+import { Camera, ImagePlus, LoaderCircle } from 'lucide-react';
 import { useRef, useState, type DragEvent } from 'react';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import type { ImageAsset, SlotKey } from '../types';
@@ -35,11 +35,22 @@ export function UploadSlot({
   onRemove,
 }: UploadSlotProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
   const previewUrl = useObjectUrl(asset?.blob);
 
   const openPicker = () => inputRef.current?.click();
+  const openCamera = () => {
+    onActivate(slot);
+    cameraRef.current?.click();
+  };
+
+  const handleInput = (input: HTMLInputElement) => {
+    const file = firstImageFile(input.files);
+    if (file) onFile(slot, file);
+    input.value = '';
+  };
 
   const handleDragEnter = (event: DragEvent) => {
     event.preventDefault();
@@ -109,7 +120,8 @@ export function UploadSlot({
             </span>
             <p className="text-[15px] font-semibold">Bild hochladen</p>
             <p className="mt-1 text-sm text-muted">{description}</p>
-            <p className="mt-3 text-xs text-subtle">Drag &amp; Drop, klicken oder Strg+V</p>
+            <p className="mt-3 text-xs text-subtle pointer-coarse:hidden">Drag &amp; Drop, klicken oder Strg+V</p>
+            <p className="mt-3 hidden text-xs text-subtle pointer-coarse:block">Tippen, um ein Bild auszuwählen</p>
           </div>
         )}
 
@@ -124,6 +136,17 @@ export function UploadSlot({
           </div>
         )}
       </div>
+
+      {/* Auf Touch-Geräten: Kamera direkt öffnen (die Dateiauswahl bietet sie nicht auf jedem Handy an). */}
+      <button
+        type="button"
+        className="btn-secondary hidden h-10 w-full pointer-coarse:inline-flex"
+        onClick={openCamera}
+        disabled={busy}
+      >
+        <Camera className="size-4" aria-hidden />
+        Foto aufnehmen
+      </button>
 
       {(error || asset) && (
         <div className="flex min-h-9 items-center justify-between gap-3 px-0.5">
@@ -158,11 +181,16 @@ export function UploadSlot({
         accept="image/*"
         className="sr-only"
         tabIndex={-1}
-        onChange={(event) => {
-          const file = firstImageFile(event.target.files);
-          if (file) onFile(slot, file);
-          event.target.value = '';
-        }}
+        onChange={(event) => handleInput(event.target)}
+      />
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        tabIndex={-1}
+        onChange={(event) => handleInput(event.target)}
       />
     </section>
   );
