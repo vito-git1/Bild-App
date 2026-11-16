@@ -206,11 +206,18 @@ export function createAuth(isProd: boolean) {
       if (name.length > MAX_NAME_LENGTH) throw badRequest(`Der Name darf höchstens ${MAX_NAME_LENGTH} Zeichen lang sein.`);
       if (!EMAIL_PATTERN.test(email)) throw badRequest('Bitte gib eine gültige E-Mail-Adresse ein.');
       validatePassword(password);
+      if ((req.body as { acceptTerms?: unknown } | undefined)?.acceptTerms !== true) {
+        throw badRequest('Bitte akzeptiere die AGB und die Datenschutzerklärung.');
+      }
 
       const { data, error } = await createAuthClient().auth.signUp({
         email,
         password,
-        options: { data: { name }, emailRedirectTo: `${originOf(req)}/?bestaetigt=1` },
+        // Zeitpunkt der AGB-Zustimmung als Nachweis im Nutzerkonto speichern.
+        options: {
+          data: { name, terms_accepted_at: new Date().toISOString() },
+          emailRedirectTo: `${originOf(req)}/?bestaetigt=1`,
+        },
       });
 
       if (error) {

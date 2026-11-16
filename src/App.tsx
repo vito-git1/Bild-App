@@ -4,6 +4,7 @@ import { ActionBar } from './components/ActionBar';
 import { AuthView } from './components/AuthView';
 import { CreditsBar } from './components/CreditsBar';
 import { HistoryView } from './components/HistoryView';
+import { LegalFooter } from './components/LegalFooter';
 import { ResultPanel } from './components/ResultPanel';
 import { TopNav } from './components/TopNav';
 import { UploadSlot } from './components/UploadSlot';
@@ -99,11 +100,11 @@ export default function App() {
     })();
   }, [user, refreshBilling]);
 
-  const handleBuy = async () => {
+  const handleBuy = async (waiverAccepted: boolean) => {
     setBuying(true);
     setBillingError(null);
     try {
-      await startCheckout();
+      await startCheckout(waiverAccepted);
     } catch (error) {
       setBillingError(messageOf(error, 'Die Bezahlseite konnte nicht geöffnet werden.'));
       setBuying(false);
@@ -371,7 +372,7 @@ export default function App() {
               buying={buying}
               error={billingError}
               notice={billingNotice}
-              onBuy={() => void handleBuy()}
+              onBuy={(waiverAccepted) => void handleBuy(waiverAccepted)}
               onDismissNotice={() => setBillingNotice(null)}
             />
 
@@ -427,6 +428,7 @@ export default function App() {
         )}
 
       </main>
+      <LegalFooter />
     </div>
   );
 }

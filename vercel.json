@@ -3,6 +3,7 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "cleanUrls": true,
   "rewrites": [
     { "source": "/api/history", "destination": "/api/webhook" },
     { "source": "/api/history/:path*", "destination": "/api/webhook" },

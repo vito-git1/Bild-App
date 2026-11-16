@@ -70,6 +70,7 @@ export function AuthView({ onAuthenticated }: AuthViewProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +125,11 @@ export function AuthView({ onAuthenticated }: AuthViewProps) {
         setNotice('Passwort geändert – du kannst dich jetzt anmelden.');
         return;
       }
-      const result = await register({ name, email, password });
+      if (!acceptTerms) {
+        setError('Bitte akzeptiere die AGB und die Datenschutzerklärung.');
+        return;
+      }
+      const result = await register({ name, email, password, acceptTerms });
       if (result.user) {
         onAuthenticated(result.user);
         return;
@@ -234,6 +239,30 @@ export function AuthView({ onAuthenticated }: AuthViewProps) {
               </button>
             </div>
             {isNewPassword && <span className="meta">Mindestens 8 Zeichen.</span>}
+          </label>
+        )}
+
+        {isRegister && (
+          <label className="flex items-start gap-2.5 text-sm" htmlFor={`${ids}-terms`}>
+            <input
+              id={`${ids}-terms`}
+              type="checkbox"
+              className="mt-1 size-4 shrink-0 accent-fg"
+              checked={acceptTerms}
+              onChange={(event) => setAcceptTerms(event.target.checked)}
+              required
+            />
+            <span>
+              Ich bin mindestens 18 Jahre alt und akzeptiere die{' '}
+              <a href="/agb" target="_blank" rel="noopener" className="underline underline-offset-2">
+                AGB
+              </a>
+              . Die{' '}
+              <a href="/datenschutz" target="_blank" rel="noopener" className="underline underline-offset-2">
+                Datenschutzerklärung
+              </a>{' '}
+              habe ich gelesen.
+            </span>
           </label>
         )}
 

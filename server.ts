@@ -8,6 +8,12 @@ const PORT = Number(process.env.PORT ?? 3000);
 /** Standardmäßig nur auf diesem Rechner erreichbar. HOST=0.0.0.0 öffnet den Server fürs Netzwerk. */
 const HOST = process.env.HOST?.trim() || '127.0.0.1';
 
+// Rechtstexte unter kurzen Adressen (/agb statt /agb.html) – auf Vercel erledigt das "cleanUrls".
+const LEGAL_PAGES = ['impressum', 'agb', 'widerruf', 'datenschutz'];
+app.get(LEGAL_PAGES.map((page) => `/${page}`), (req, res) => {
+  res.sendFile(path.join(ROOT, IS_PROD ? 'dist' : 'public', `${req.path.slice(1)}.html`));
+});
+
 if (IS_PROD) {
   const dist = path.join(ROOT, 'dist');
   app.use(express.static(dist, { index: false, maxAge: '1h' }));

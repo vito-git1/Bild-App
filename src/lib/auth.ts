@@ -23,7 +23,12 @@ export interface RegisterResult {
   user?: AuthUser;
 }
 
-export async function register(input: { name: string; email: string; password: string }): Promise<RegisterResult> {
+export async function register(input: {
+  name: string;
+  email: string;
+  password: string;
+  acceptTerms: boolean;
+}): Promise<RegisterResult> {
   const response = await postJson('register', input);
   if (!response.ok) throw await toApiError(response, 'Die Registrierung ist fehlgeschlagen.');
   return (await response.json()) as RegisterResult;

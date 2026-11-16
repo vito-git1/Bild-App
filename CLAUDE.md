@@ -46,6 +46,10 @@ The browser never calls n8n directly; the proxy exists to avoid CORS and to norm
 - `server/ssrf.ts` — SSRF protection. `parseWebhookUrl` rejects non-http(s), credentials, and obviously local hosts/IPs; `guardedAgent` (undici `Agent` with a custom DNS `lookup`) re-checks every resolved address at connect time, and its custom connector also rejects private IP *literals* (which skip DNS lookup), so redirects and DNS rebinding are covered. **All outbound fetches (webhook and result-image URLs) must use `dispatcher: guardedAgent`.**
 - `ProxyErrorBody` (`server/errors.ts`) and `AuthUser` (`server/auth.ts`) are duplicated in `src/types.ts` — keep them in sync.
 
+### Rechtstexte
+- Static pages `public/impressum.html`, `agb.html`, `widerruf.html`, `datenschutz.html` (+ `public/legal.css`, no inline styles because of the CSP), served as `/impressum` etc. via `"cleanUrls": true` on Vercel and an explicit route in `server.ts` locally. Personal data of the operator are still placeholders (`<span class="platzhalter">[…]</span>`) — search for `platzhalter` before going live. Texts are a template, not legal advice.
+- `components/LegalFooter.tsx` links them on every view. Registration requires the checkbox (`acceptTerms` → server rejects otherwise, stores `terms_accepted_at` in `user_metadata`). Purchases require the § 356 Abs. 5 BGB waiver checkbox in `CreditsBar` (`waiverAccepted` → `POST /api/billing/checkout` rejects otherwise; `metadata.waiver_accepted_at` + `custom_text.submit` on the Stripe session).
+
 ### Client (`src/`)
 - React 19 + Tailwind CSS v4 (via `@tailwindcss/vite`), `lucide-react` icons. Fonts loaded from Google Fonts in `index.html`.
 - `config.ts` — proxy endpoint, upload limit, localStorage keys. The webhook URL must never be put into client code or UI (product decision: it should not be visible on the page).

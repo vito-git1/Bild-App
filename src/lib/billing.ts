@@ -18,10 +18,11 @@ export async function getBilling(session?: string): Promise<BillingInfo> {
 }
 
 /** Erstellt eine Stripe-Bezahlseite und leitet dorthin weiter. */
-export async function startCheckout(): Promise<void> {
+export async function startCheckout(waiverAccepted: boolean): Promise<void> {
   const response = await request(`${BILLING_ENDPOINT}/checkout`, {
     method: 'POST',
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ waiverAccepted }),
   });
   if (!response.ok) throw await toApiError(response, 'Die Bezahlseite konnte nicht geöffnet werden.');
   const { url } = (await response.json()) as { url: string };

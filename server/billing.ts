@@ -104,9 +104,13 @@ export function createBilling(requireUser: (req: Request, res: Response, next: N
   });
 
   /** Legt eine Stripe-Checkout-Session an und gibt die URL der Bezahlseite zurück. */
-  router.post('/checkout', requireUser, async (req, res, next) => {
+  router.post('/checkout', requireUser, express.json({ limit: '2kb' }), async (req, res, next) => {
     try {
       const user = currentUser(res);
+      // § 356 Abs. 5 BGB: ausdrückliche Zustimmung zum sofortigen Beginn + Kenntnis vom Verlust des Widerrufsrechts.
+      if ((req.body as { waiverAccepted?: unknown } | undefined)?.waiverAccepted !== true) {
+        throw new ProxyError(400, 'Bitte bestätige vor dem Kauf den Hinweis zum Widerrufsrecht.');
+      }
       const origin = originOf(req);
       const session = await stripe().checkout.sessions.create({
         mode: 'payment',
@@ -122,7 +126,18 @@ export function createBilling(requireUser: (req: Request, res: Response, next: N
         ],
         client_reference_id: user.id,
         customer_email: user.email || undefined,
-        metadata: { user_id: user.id, credits: String(PACK_CREDITS) },
+        metadata: {
+          user_id: user.id,
+          credits: String(PACK_CREDITS),
+          // Nachweis der Zustimmung (Zeitpunkt), bleibt bei Stripe am Vorgang gespeichert.
+          waiver_accepted_at: new Date().toISOString(),
+        },
+        custom_text: {
+          submit: {
+            message:
+              'Du hast zugestimmt, dass das Guthaben sofort gutgeschrieben wird, und weißt, dass du damit dein Widerrufsrecht verlierst. Es gelten die AGB von Kleiderstudio.',
+          },
+        },
         // {CHECKOUT_SESSION_ID} ersetzt Stripe selbst; die App fragt damit nach, ob genau dieser Kauf gebucht ist.
         success_url: `${origin}/?kauf=ok&session={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/?kauf=abbruch`,
