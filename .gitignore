@@ -10,3 +10,6 @@ Screenshot*.png
 supabase/.temp
 supabase/.branches
 supabase/.env
+
+# Original-Beispielbilder (nie committen)
+showcase-roh/
