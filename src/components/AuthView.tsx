@@ -17,6 +17,10 @@ const MODES: Array<{ value: TabMode; label: string }> = [
 
 interface AuthViewProps {
   onAuthenticated: (user: AuthUser) => void;
+  /** embedded: als Karte neben der Startseite (kompakter Kopf, ohne Maßband). */
+  variant?: 'page' | 'embedded';
+  /** Wechselt von außen in einen Modus (z. B. „Kostenlos starten“ → Registrieren); `nonce` erzwingt den Wechsel erneut. */
+  request?: { mode: TabMode; nonce: number };
 }
 
 interface LinkResult {
@@ -65,7 +69,7 @@ const TITLES: Record<Mode, { title: string; text: string; submit: string }> = {
   reset: { title: 'Neues Passwort', text: 'Wähle ein neues Passwort für dein Konto.', submit: 'Passwort speichern' },
 };
 
-export function AuthView({ onAuthenticated }: AuthViewProps) {
+export function AuthView({ onAuthenticated, variant = 'page', request }: AuthViewProps) {
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -95,6 +99,13 @@ export function AuthView({ onAuthenticated }: AuthViewProps) {
     setError(null);
     setNotice(null);
   };
+
+  useEffect(() => {
+    if (!request) return;
+    setMode(request.mode);
+    setError(null);
+    setNotice(null);
+  }, [request]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -155,12 +166,23 @@ export function AuthView({ onAuthenticated }: AuthViewProps) {
   const texts = TITLES[mode];
 
   return (
-    <div className="mx-auto flex max-w-[420px] flex-col gap-6 pt-8 sm:pt-16">
-      <header className="text-center">
-        <h1 className="text-3xl font-extrabold tracking-[-0.02em] [font-stretch:80%] sm:text-4xl">{texts.title}</h1>
-        <p className="mt-2 text-sm text-muted">{texts.text}</p>
-        <TapeMeasure motion="unroll" className="mx-auto mt-5 max-w-[16rem]" />
-      </header>
+    <div
+      className={
+        variant === 'page' ? 'mx-auto flex max-w-[420px] flex-col gap-6 pt-8 sm:pt-16' : 'flex w-full flex-col gap-4'
+      }
+    >
+      {variant === 'page' ? (
+        <header className="text-center">
+          <h1 className="text-3xl font-extrabold tracking-[-0.02em] [font-stretch:80%] sm:text-4xl">{texts.title}</h1>
+          <p className="mt-2 text-sm text-muted">{texts.text}</p>
+          <TapeMeasure motion="unroll" className="mx-auto mt-5 max-w-[16rem]" />
+        </header>
+      ) : (
+        <header>
+          <h2 className="text-2xl font-extrabold tracking-tight">{texts.title}</h2>
+          <p className="mt-1 text-sm text-muted">{texts.text}</p>
+        </header>
+      )}
 
       <form className="card flex flex-col gap-4 p-5 sm:p-6" onSubmit={(event) => void handleSubmit(event)} noValidate>
         {isTab && (

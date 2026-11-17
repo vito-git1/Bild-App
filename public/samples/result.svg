@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">
+  <defs>
+    <radialGradient id="backdrop" cx="50%" cy="38%" r="75%">
+      <stop offset="0" stop-color="#D9D7D3"/>
+      <stop offset="1" stop-color="#A9A6A1"/>
+    </radialGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#D8B49A"/>
+      <stop offset="1" stop-color="#B98F74"/>
+    </linearGradient>
+    <linearGradient id="fabric" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4A5A73"/>
+      <stop offset="1" stop-color="#2F3B4F"/>
+    </linearGradient>
+    <linearGradient id="pants" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3A3B40"/>
+      <stop offset="1" stop-color="#26272B"/>
+    </linearGradient>
+  </defs>
+  <rect width="768" height="1024" fill="url(#backdrop)"/>
+  <ellipse cx="384" cy="992" rx="190" ry="20" fill="#000" opacity="0.12"/>
+  <path d="M300 600 L292 975 L360 975 L380 640 L388 640 L408 975 L476 975 L468 600 Z" fill="url(#pants)"/>
+  <path d="M286 968 h80 v18 h-86 z M402 968 h80 l6 18 h-86 z" fill="#1A1A1D"/>
+  <!-- Hände -->
+  <ellipse cx="224" cy="566" rx="16" ry="22" fill="url(#skin)"/>
+  <ellipse cx="544" cy="566" rx="16" ry="22" fill="url(#skin)"/>
+  <!-- Ärmel der Strickjacke -->
+  <path d="M262 296 C226 330 208 430 204 548 L246 552 C252 466 264 392 290 340 Z" fill="url(#fabric)"/>
+  <path d="M506 296 C542 330 560 430 564 548 L522 552 C516 466 504 392 478 340 Z" fill="url(#fabric)"/>
+  <path d="M204 540 L246 544 M564 540 L522 544" stroke="#24303F" stroke-width="3"/>
+  <!-- Shirt darunter -->
+  <path d="M340 256 L428 256 L420 612 L348 612 Z" fill="#EDEBE6"/>
+  <!-- Strickjacke -->
+  <path d="M288 266 C314 252 334 248 350 248 L384 360 L418 248 C434 248 454 252 480 266 L512 312 L486 352 L476 336 L472 640 L296 640 L292 336 L282 352 L256 312 Z" fill="url(#fabric)"/>
+  <path d="M384 360 L384 640" stroke="#24303F" stroke-width="3"/>
+  <g fill="#D7D3CC">
+    <circle cx="394" cy="400" r="6"/><circle cx="394" cy="460" r="6"/>
+    <circle cx="394" cy="520" r="6"/><circle cx="394" cy="580" r="6"/>
+  </g>
+  <path d="M316 470 h44 v48 h-44 z M408 470 h44 v48 h-44 z" fill="none" stroke="#24303F" stroke-width="3"/>
+  <path d="M296 626 h176" stroke="#24303F" stroke-width="3" stroke-dasharray="6 6"/>
+  <path d="M362 214 h44 v40 c-10 12 -34 12 -44 0 z" fill="url(#skin)"/>
+  <ellipse cx="384" cy="162" rx="56" ry="68" fill="url(#skin)"/>
+  <path d="M326 156 C322 96 352 80 386 80 C424 80 448 102 444 160 C436 128 420 112 384 112 C352 112 334 126 326 156 Z" fill="#2B2420"/>
+</svg>

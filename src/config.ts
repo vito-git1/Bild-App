@@ -10,3 +10,13 @@ export const AUTH_ENDPOINT = '/api/auth';
 export const BILLING_ENDPOINT = '/api/billing';
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Angaben für die Startseite (vor dem Login gibt es keine Guthaben-API).
+ * Müssen zur Spalten-Voreinstellung `profiles.credits` und zu CREDIT_PACK_SIZE/CREDIT_PACK_PRICE_CENTS passen.
+ */
+export const MARKETING = {
+  freeImages: 3,
+  packImages: 25,
+  packPrice: '9,99 €',
+} as const;

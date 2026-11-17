@@ -51,6 +51,14 @@ export function TopNav({ user, view, onViewChange, onLoadSamples, loadingSamples
           <span />
         )}
 
+        {!user && (
+          <div className="flex justify-end">
+            <a href="#konto" className="btn-secondary h-9">
+              Anmelden
+            </a>
+          </div>
+        )}
+
         {user && (
           <div className="flex items-center justify-end gap-1 sm:gap-2">
             <button type="button" className="btn-secondary" onClick={onLoadSamples} disabled={loadingSamples}>

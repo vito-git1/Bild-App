@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
 import { ActionBar } from './components/ActionBar';
-import { AuthView } from './components/AuthView';
 import { CreditsBar } from './components/CreditsBar';
 import { HistoryView } from './components/HistoryView';
+import { Landing } from './components/Landing';
 import { LegalFooter } from './components/LegalFooter';
 import { ResultPanel } from './components/ResultPanel';
 import { TapeMeasure } from './components/TapeMeasure';
@@ -358,8 +358,8 @@ export default function App() {
         )}
 
         {user === null && (
-          <div className="animate-view-in">
-            <AuthView onAuthenticated={setUser} />
+          <div className="mx-auto max-w-[1200px] animate-view-in">
+            <Landing onAuthenticated={setUser} />
           </div>
         )}
 
