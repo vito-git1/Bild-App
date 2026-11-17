@@ -10,7 +10,3 @@ export const AUTH_ENDPOINT = '/api/auth';
 export const BILLING_ENDPOINT = '/api/billing';
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-
-export const STORAGE_KEYS = {
-  uploadFormat: 'kleiderstudio.uploadFormat',
-} as const;
