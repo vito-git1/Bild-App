@@ -1,4 +1,4 @@
-import { ArrowLeftRight, LoaderCircle, Sparkles, X } from 'lucide-react';
+import { ArrowLeftRight, LoaderCircle, Shirt, X } from 'lucide-react';
 
 interface ActionBarProps {
   canSwap: boolean;
@@ -11,7 +11,7 @@ interface ActionBarProps {
   onSend: () => void;
 }
 
-/** Zentrierter „Generieren“-Button mit kleinen Zusatzaktionen darunter. */
+/** Zentrierter „Anprobieren“-Button mit kleinen Zusatzaktionen darunter. */
 export function ActionBar({
   canSwap,
   canClear,
@@ -29,17 +29,20 @@ export function ActionBar({
         onClick={onSend}
         disabled={!canSend}
         title={blockedReason ?? 'Strg+Enter'}
-        className="inline-flex h-12 min-w-44 items-center justify-center gap-2 rounded-xl bg-fg px-7 text-[15px] font-semibold text-white shadow-[0_4px_14px_rgb(30_33_48/0.18)] transition enabled:hover:-translate-y-px enabled:hover:bg-black disabled:cursor-not-allowed disabled:bg-raised disabled:text-subtle disabled:shadow-[0_2px_8px_rgb(30_33_48/0.08)]"
+        className="group inline-flex h-14 min-w-52 items-center justify-center gap-2.5 rounded-full bg-fg px-8 font-display text-lg font-bold tracking-tight text-white shadow-[0_12px_28px_-12px_rgb(23_32_54/0.7)] transition-[transform,background-color,box-shadow] duration-200 ease-out-soft enabled:hover:-translate-y-0.5 enabled:hover:bg-accent enabled:hover:shadow-[0_16px_32px_-12px_rgb(44_79_184/0.6)] enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-raised disabled:text-subtle disabled:shadow-none"
       >
         {sending ? (
-          <LoaderCircle className="size-4 animate-spin" aria-hidden />
+          <LoaderCircle className="size-5 animate-spin" aria-hidden />
         ) : (
-          <Sparkles className="size-4" aria-hidden />
+          <Shirt
+            className="size-5 transition-transform duration-300 ease-out-soft group-enabled:group-hover:-rotate-12"
+            aria-hidden
+          />
         )}
-        {sending ? 'Wird generiert …' : 'Generieren'}
+        {sending ? 'Anprobe läuft …' : 'Anprobieren'}
       </button>
 
-      <p className="min-h-4 text-xs text-subtle">{sending ? '' : blockedReason ?? 'oder Strg+Enter'}</p>
+      <p className="min-h-4 text-xs text-muted">{sending ? '' : blockedReason ?? 'oder Strg+Enter'}</p>
 
       {(canSwap || canClear) && (
         <div className="flex gap-1">

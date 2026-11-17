@@ -21,7 +21,7 @@ export function ImageMeta({ asset, extra = [], className = '' }: ImageMetaProps)
       {parts.map((part, index) => (
         <span key={index}>
           {index > 0 && <span className="px-1.5 text-subtle">·</span>}
-          <span className={index === 0 ? '' : 'font-mono text-[11px]'}>{part}</span>
+          <span>{part}</span>
         </span>
       ))}
     </p>

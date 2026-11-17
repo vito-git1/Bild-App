@@ -1,5 +1,6 @@
-import { Download, Expand, LoaderCircle, RotateCcw, Undo2 } from 'lucide-react';
+import { Download, Expand, RotateCcw, Undo2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { TapeMeasure } from './TapeMeasure';
 import { useElapsed } from '../hooks/useElapsed';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import { formatSeconds } from '../lib/format';
@@ -15,12 +16,6 @@ const MODE_OPTIONS: Array<{ value: ResultMode; label: string }> = [
   { value: 'all', label: 'Alle 3' },
 ];
 
-const SOURCE_LABELS: Record<GenerationResult['source'], string> = {
-  binary: 'Binär',
-  base64: 'Base64',
-  url: 'Bild-URL',
-};
-
 interface ResultPanelProps {
   state: RequestState;
   onAbort: () => void;
@@ -32,7 +27,7 @@ interface ResultPanelProps {
 
 export function ResultPanel({ state, onAbort, onRetry, canRetry, onUseAsImage1, onDownload }: ResultPanelProps) {
   return (
-    <section className="card flex min-h-0 flex-col" aria-label="Ergebnis" aria-live="polite">
+    <section className="card flex min-h-0 animate-view-in flex-col" aria-label="Ergebnis" aria-live="polite">
       {state.status === 'success' ? (
         <SuccessView key={state.result.output.id} result={state.result} onUseAsImage1={onUseAsImage1} onDownload={onDownload} />
       ) : (
@@ -56,7 +51,7 @@ export function ResultPanel({ state, onAbort, onRetry, canRetry, onUseAsImage1, 
 function PanelHeader({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <header className="flex min-h-14 flex-wrap items-center justify-between gap-3 px-4 py-3">
-      <h2 className="font-display text-sm font-semibold">{title}</h2>
+      <h2 className="text-lg font-bold tracking-tight">{title}</h2>
       {children}
     </header>
   );
@@ -65,7 +60,7 @@ function PanelHeader({ title, children }: { title: string; children?: ReactNode 
 function Stage({ children }: { children: ReactNode }) {
   return (
     <div
-      className="relative mx-4 flex h-[min(70vh,720px)] min-h-[360px] items-center justify-center overflow-hidden rounded-lg border border-line bg-canvas"
+      className="relative mx-4 flex h-[min(70vh,720px)] min-h-[360px] items-center justify-center overflow-hidden rounded-xl border border-line bg-canvas"
       style={{ containerType: 'size' }}
     >
       {children}
@@ -76,16 +71,8 @@ function Stage({ children }: { children: ReactNode }) {
 function EmptyView() {
   return (
     <div className="flex max-w-sm flex-col items-center gap-5 px-6 text-center">
-      <div className="flex items-center gap-3 font-mono text-xs text-muted">
-        <span className="rounded-md border border-line px-2 py-1">image1</span>
-        <span className="text-subtle">+</span>
-        <span className="rounded-md border border-line px-2 py-1">image2</span>
-        <span className="text-subtle">→</span>
-        <span className="rounded-md border border-line-strong px-2 py-1 text-fg">Ergebnis</span>
-      </div>
       <p className="text-sm leading-relaxed text-muted">
-        Beide Bilder werden als <span className="text-fg">multipart/form-data</span> an den n8n-Webhook gesendet. Das
-        zurückgegebene Bild erscheint hier.
+        Füge oben eine Person und ein Kleidungsstück hinzu und tippe auf „Anprobieren“. Das Ergebnis erscheint hier.
       </p>
     </div>
   );
@@ -94,12 +81,14 @@ function EmptyView() {
 function LoadingView({ startedAt, onAbort }: { startedAt: number; onAbort: () => void }) {
   const elapsed = useElapsed(startedAt);
   return (
-    <div className="flex w-full max-w-md flex-col items-center gap-4 px-6 text-center">
-      <LoaderCircle className="size-5 animate-spin text-muted" aria-hidden />
+    <div className="flex w-full max-w-md animate-fade-in flex-col items-center gap-5 px-6 text-center">
       <div>
-        <p className="font-display text-3xl font-semibold tabular-nums">{formatSeconds(elapsed)}</p>
-        <p className="mt-1 text-sm text-muted">Das Bild wird generiert …</p>
+        <p className="font-display text-5xl font-extrabold tracking-tight tabular-nums [font-stretch:80%]">
+          {formatSeconds(elapsed)}
+        </p>
+        <p className="mt-2 text-sm text-muted">Wir nehmen Maß und passen das Teil an. Das dauert meist unter einer Minute.</p>
       </div>
+      <TapeMeasure motion="run" className="w-full max-w-xs" />
       <button type="button" className="btn-secondary" onClick={onAbort}>
         Anfrage abbrechen
       </button>
@@ -124,10 +113,10 @@ function ErrorView({
       : undefined);
 
   return (
-    <div className="flex h-full w-full flex-col gap-4 overflow-y-auto p-5">
+    <div className="flex h-full w-full animate-fade-in flex-col gap-4 overflow-y-auto p-5">
       <div>
         <p className="font-display text-base font-semibold">
-          {failure.aborted ? 'Anfrage abgebrochen' : 'Anfrage fehlgeschlagen'}
+          {failure.aborted ? 'Anprobe abgebrochen' : 'Anprobe fehlgeschlagen'}
           {failure.httpStatus !== undefined && (
             <span className="ml-2 font-mono text-sm font-medium text-danger tabular-nums">HTTP {failure.httpStatus}</span>
           )}
@@ -138,18 +127,18 @@ function ErrorView({
       {hint && <p className="border-l-2 border-notice/60 pl-3 text-sm text-fg/90">{hint}</p>}
 
       {failure.rawBody && (
-        <div className="min-h-0">
-          <p className="mb-1.5 text-xs font-medium text-muted">Technische Details</p>
-          <pre className="max-h-64 overflow-auto rounded-lg border border-line bg-surface p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all text-fg/90">
+        <details className="group min-h-0">
+          <summary className="cursor-pointer text-xs font-medium text-muted hover:text-fg">Technische Details</summary>
+          <pre className="mt-1.5 max-h-64 animate-slide-down overflow-auto rounded-lg border border-line bg-surface p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all text-fg/90">
             {failure.rawBody}
           </pre>
-        </div>
+        </details>
       )}
 
       <div>
         <button type="button" className="btn-secondary" onClick={onRetry} disabled={!canRetry}>
           <RotateCcw className="size-4" aria-hidden />
-          Erneut senden
+          Erneut anprobieren
         </button>
       </div>
     </div>
@@ -167,6 +156,8 @@ function SuccessView({
 }) {
   const [mode, setMode] = useState<ResultMode>('result');
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  /** Vorhang wird nur beim ersten Anzeigen eines Ergebnisses gezeigt und danach entfernt. */
+  const [curtain, setCurtain] = useState(true);
   const outputUrl = useObjectUrl(result.output.blob);
   const image1Url = useObjectUrl(result.inputs.image1.blob);
   const image2Url = useObjectUrl(result.inputs.image2.blob);
@@ -179,6 +170,12 @@ function SuccessView({
       </PanelHeader>
 
       <Stage>
+        {curtain && (
+          <>
+            <span className="curtain curtain-left" aria-hidden />
+            <span className="curtain curtain-right" aria-hidden onAnimationEnd={() => setCurtain(false)} />
+          </>
+        )}
         {outputUrl && mode === 'result' && (
           <button
             type="button"
@@ -186,7 +183,7 @@ function SuccessView({
             onClick={() => setLightboxOpen(true)}
             aria-label="Ergebnis im Vollbild anzeigen"
           >
-            <img src={outputUrl} alt="Ergebnis" className="size-full object-contain" />
+            <img src={outputUrl} alt="Ergebnis" className={['size-full object-contain', curtain ? 'curtain-reveal' : ''].join(' ')} />
           </button>
         )}
         {outputUrl && image1Url && mode === 'compare' && (
@@ -195,15 +192,15 @@ function SuccessView({
         {mode === 'all' && (
           <div className="grid size-full grid-cols-3 gap-px bg-line">
             {[
-              { url: image1Url, label: 'image1' },
-              { url: image2Url, label: 'image2' },
+              { url: image1Url, label: 'Person' },
+              { url: image2Url, label: 'Kleidungsstück' },
               { url: outputUrl, label: 'Ergebnis' },
             ].map((item) => (
-              <figure key={item.label} className="flex min-w-0 flex-col bg-canvas">
+              <figure key={item.label} className="flex min-w-0 animate-fade-in flex-col bg-canvas">
                 <div className="flex min-h-0 flex-1 items-center justify-center p-2">
                   {item.url && <img src={item.url} alt={item.label} className="max-h-full max-w-full object-contain" />}
                 </div>
-                <figcaption className="border-t border-line px-2 py-1.5 text-center font-mono text-[11px] text-muted">
+                <figcaption className="truncate border-t border-line px-2 py-1.5 text-center text-xs text-muted">
                   {item.label}
                 </figcaption>
               </figure>
@@ -215,7 +212,7 @@ function SuccessView({
       <footer className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <ImageMeta
           asset={output}
-          extra={[formatSeconds(result.durationMs), SOURCE_LABELS[result.source]]}
+          extra={[formatSeconds(result.durationMs)]}
         />
         <div className="flex flex-wrap gap-2">
           <button type="button" className="btn-ghost" onClick={() => setLightboxOpen(true)}>
@@ -224,7 +221,7 @@ function SuccessView({
           </button>
           <button type="button" className="btn-secondary" onClick={() => onUseAsImage1(output)}>
             <Undo2 className="size-4" aria-hidden />
-            Als image1 übernehmen
+            Als Person übernehmen
           </button>
           <button type="button" className="btn-primary" onClick={() => onDownload(output)}>
             <Download className="size-4" aria-hidden />

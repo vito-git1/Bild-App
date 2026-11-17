@@ -18,12 +18,19 @@ export function SegmentedControl<T extends string>({
   onChange,
   size = 'md',
 }: SegmentedControlProps<T>) {
+  const index = Math.max(0, options.findIndex((option) => option.value === value));
   return (
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex shrink-0 rounded-lg border border-line bg-canvas p-0.5"
+      className="relative grid shrink-0 auto-cols-fr grid-flow-col rounded-lg border border-line bg-canvas p-0.5"
     >
+      {/* Gleitender Hintergrund unter der aktiven Option */}
+      <span
+        aria-hidden
+        className="absolute inset-y-0.5 left-0.5 rounded-md bg-surface shadow-[0_1px_2px_rgb(23_32_54/0.15)] transition-transform duration-300 ease-out-soft"
+        style={{ width: `calc((100% - 4px) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
+      />
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -34,9 +41,9 @@ export function SegmentedControl<T extends string>({
             aria-checked={active}
             onClick={() => onChange(option.value)}
             className={[
-              'rounded-md font-medium transition-colors',
+              'relative rounded-md font-medium transition-colors',
               size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-sm',
-              active ? 'bg-raised text-fg' : 'text-muted hover:text-fg',
+              active ? 'text-fg' : 'text-muted hover:text-fg',
             ].join(' ')}
           >
             {option.label}

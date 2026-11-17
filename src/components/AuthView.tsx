@@ -4,6 +4,7 @@ import { messageOf } from '../lib/apiClient';
 import { login, register, requestPasswordReset, resetPassword } from '../lib/auth';
 import type { AuthUser } from '../types';
 import { SegmentedControl } from './SegmentedControl';
+import { TapeMeasure } from './TapeMeasure';
 
 /** login/register: Umschalter sichtbar; forgot: Mail anfordern; reset: neues Passwort nach dem Mail-Link. */
 type Mode = 'login' | 'register' | 'forgot' | 'reset';
@@ -156,8 +157,9 @@ export function AuthView({ onAuthenticated }: AuthViewProps) {
   return (
     <div className="mx-auto flex max-w-[420px] flex-col gap-6 pt-8 sm:pt-16">
       <header className="text-center">
-        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{texts.title}</h1>
+        <h1 className="text-3xl font-extrabold tracking-[-0.02em] [font-stretch:80%] sm:text-4xl">{texts.title}</h1>
         <p className="mt-2 text-sm text-muted">{texts.text}</p>
+        <TapeMeasure motion="unroll" className="mx-auto mt-5 max-w-[16rem]" />
       </header>
 
       <form className="card flex flex-col gap-4 p-5 sm:p-6" onSubmit={(event) => void handleSubmit(event)} noValidate>
@@ -267,12 +269,12 @@ export function AuthView({ onAuthenticated }: AuthViewProps) {
         )}
 
         {error && (
-          <p className="text-sm text-danger" role="alert">
+          <p className="animate-slide-down text-sm text-danger" role="alert">
             {error}
           </p>
         )}
         {notice && (
-          <p className="rounded-lg bg-raised px-3 py-2 text-sm" role="status">
+          <p className="animate-slide-down rounded-lg bg-raised px-3 py-2 text-sm" role="status">
             {notice}
           </p>
         )}

@@ -45,7 +45,7 @@ export function CompareSlider({ beforeUrl, afterUrl, width, height }: CompareSli
       ref={containerRef}
       role="slider"
       tabIndex={0}
-      aria-label="Vergleich zwischen image1 und Ergebnis"
+      aria-label="Vergleich zwischen Person und Ergebnis"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(position)}
@@ -57,7 +57,7 @@ export function CompareSlider({ beforeUrl, afterUrl, width, height }: CompareSli
       // Füllt den Container (container-type: size) unter Beibehaltung des Seitenverhältnisses.
       style={{ aspectRatio: `${width} / ${height}`, width: `min(100cqw, calc(100cqh * ${width / height}))` }}
     >
-      <img src={beforeUrl} alt="Vorher (image1)" className="absolute inset-0 size-full object-contain" draggable={false} />
+      <img src={beforeUrl} alt="Vorher (Person)" className="absolute inset-0 size-full object-contain" draggable={false} />
       <img
         src={afterUrl}
         alt="Nachher (Ergebnis)"
@@ -65,9 +65,13 @@ export function CompareSlider({ beforeUrl, afterUrl, width, height }: CompareSli
         style={{ clipPath: `inset(0 0 0 ${position}%)` }}
         draggable={false}
       />
-      <div className="pointer-events-none absolute inset-y-0 w-px bg-fg/90" style={{ left: `${position}%` }}>
-        <div className="absolute top-1/2 left-1/2 flex h-8 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md border border-line-strong bg-canvas">
-          <div className="h-3 w-px bg-fg/70" />
+      <div
+        className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-tape shadow-[0_0_0_1px_rgb(23_32_54/0.35)]"
+        style={{ left: `${position}%` }}
+      >
+        <div className="absolute top-1/2 left-1/2 flex h-10 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-0.5 rounded-full border border-tape-edge bg-tape shadow-md">
+          <div className="h-3.5 w-px bg-fg/70" />
+          <div className="h-3.5 w-px bg-fg/70" />
         </div>
       </div>
       <span className="pointer-events-none absolute top-2 left-2 rounded bg-canvas/80 px-1.5 py-0.5 text-[11px] text-muted">

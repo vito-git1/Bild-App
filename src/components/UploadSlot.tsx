@@ -6,6 +6,8 @@ import { ImageMeta } from './ImageMeta';
 
 interface UploadSlotProps {
   slot: SlotKey;
+  /** Position im Ablauf (1 = Person, 2 = Kleidungsstück). */
+  step: number;
   title: string;
   description: string;
   asset: ImageAsset | null;
@@ -24,6 +26,7 @@ function firstImageFile(list: FileList | null | undefined): File | null {
 
 export function UploadSlot({
   slot,
+  step,
   title,
   description,
   asset,
@@ -81,7 +84,18 @@ export function UploadSlot({
       onPointerEnter={() => onActivate(slot)}
       onFocusCapture={() => onActivate(slot)}
     >
-      <h2 className="px-0.5 text-sm font-semibold">{title}</h2>
+      <h2 className="flex items-center gap-2 px-0.5 text-base font-bold tracking-tight">
+        <span
+          className={[
+            'flex size-6 items-center justify-center rounded-full text-xs font-bold tabular-nums transition-colors duration-300',
+            asset ? 'bg-tape text-fg' : 'bg-raised text-muted',
+          ].join(' ')}
+          aria-hidden
+        >
+          {step}
+        </span>
+        {title}
+      </h2>
 
       <div
         role="button"
@@ -102,23 +116,31 @@ export function UploadSlot({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={[
-          'relative flex cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed bg-surface transition-colors',
-          asset ? 'aspect-[4/5]' : 'aspect-[16/10]',
+          'group relative flex cursor-pointer items-center justify-center overflow-hidden rounded-2xl border bg-surface transition-[border-color,outline-color,background-color,transform] duration-300 ease-out-soft',
+          // Naht: gestrichelte Linie knapp innerhalb des Rands, wie eine Steppnaht.
+          'outline-[1.5px] outline-offset-[-9px] outline-dashed',
+          asset ? 'aspect-[4/5]' : 'aspect-[4/3]',
           dragging
-            ? 'border-accent bg-accent/5'
+            ? 'scale-[1.015] border-accent bg-accent/5 outline-accent'
             : active
-              ? 'border-line-strong'
-              : 'border-line hover:border-line-strong',
+              ? 'border-line-strong outline-line-strong'
+              : 'border-line outline-line hover:border-line-strong hover:outline-line-strong',
         ].join(' ')}
       >
         {asset && previewUrl ? (
-          <img src={previewUrl} alt={asset.name} className="size-full object-contain p-2" draggable={false} />
+          <img
+            key={asset.id}
+            src={previewUrl}
+            alt={asset.name}
+            className="size-full animate-drop-in object-contain p-3"
+            draggable={false}
+          />
         ) : (
           <div className="flex max-w-[18rem] flex-col items-center px-6 text-center">
-            <span className="mb-3 flex size-11 items-center justify-center rounded-full bg-raised">
-              <ImagePlus className="size-5 text-muted" strokeWidth={1.75} aria-hidden />
+            <span className="mb-3 flex size-11 items-center justify-center rounded-full bg-raised transition-transform duration-300 ease-out-soft group-hover:-translate-y-0.5">
+              <ImagePlus className="size-5 text-fg" strokeWidth={1.75} aria-hidden />
             </span>
-            <p className="text-[15px] font-semibold">Bild hochladen</p>
+            <p className="text-[15px] font-semibold">Bild auswählen</p>
             <p className="mt-1 text-sm text-muted">{description}</p>
             <p className="mt-3 text-xs text-subtle pointer-coarse:hidden">Drag &amp; Drop, klicken oder Strg+V</p>
             <p className="mt-3 hidden text-xs text-subtle pointer-coarse:block">Tippen, um ein Bild auszuwählen</p>
@@ -126,12 +148,12 @@ export function UploadSlot({
         )}
 
         {dragging && (
-          <div className="absolute inset-0 flex items-center justify-center bg-surface/85 text-sm font-medium">
+          <div className="absolute inset-0 flex animate-fade-in items-center justify-center bg-surface/85 text-sm font-medium">
             Loslassen zum {asset ? 'Ersetzen' : 'Hinzufügen'}
           </div>
         )}
         {busy && (
-          <div className="absolute inset-0 flex items-center justify-center bg-surface/70">
+          <div className="absolute inset-0 flex animate-fade-in items-center justify-center bg-surface/70">
             <LoaderCircle className="size-5 animate-spin text-muted" aria-label="Bild wird gelesen" />
           </div>
         )}
@@ -149,7 +171,7 @@ export function UploadSlot({
       </button>
 
       {(error || asset) && (
-        <div className="flex min-h-9 items-center justify-between gap-3 px-0.5">
+        <div className="flex min-h-9 animate-fade-in items-center justify-between gap-3 px-0.5">
           {error ? (
             <p className="text-xs text-danger" role="alert">
               {error}

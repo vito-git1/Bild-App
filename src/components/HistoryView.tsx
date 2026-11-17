@@ -70,7 +70,7 @@ export function HistoryView({ revision, onRestore, onDownload }: HistoryViewProp
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-display text-lg font-semibold">Verlauf</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight [font-stretch:80%]">Verlauf</h1>
           <p className="meta mt-0.5">
             {entries ? `${entries.length} ${entries.length === 1 ? 'Generierung' : 'Generierungen'}` : 'Wird geladen …'}
             <span className="px-1.5 text-subtle">·</span>
@@ -105,7 +105,7 @@ export function HistoryView({ revision, onRestore, onDownload }: HistoryViewProp
           <p className="text-sm">{entries.length === 0 ? 'Noch keine Generierungen' : 'Keine Treffer'}</p>
           <p className="text-xs text-muted">
             {entries.length === 0
-              ? 'Erfolgreiche Anfragen an den Webhook werden hier automatisch gespeichert.'
+              ? 'Jede fertige Anprobe landet automatisch hier.'
               : `Kein Dateiname enthält „${query.trim()}“.`}
           </p>
         </div>
@@ -130,8 +130,13 @@ export function HistoryView({ revision, onRestore, onDownload }: HistoryViewProp
 function Thumb({ image, label, large = false }: { image: HistoryImage; label: string; large?: boolean }) {
   return (
     <div className={`relative overflow-hidden bg-canvas ${large ? 'col-span-2 row-span-2' : ''}`}>
-      <img src={image.url} alt={`${label}: ${image.name}`} className="size-full object-contain" loading="lazy" />
-      <span className="absolute bottom-1 left-1 rounded bg-canvas/80 px-1 font-mono text-[10px] text-muted">{label}</span>
+      <img
+        src={image.url}
+        alt={`${label}: ${image.name}`}
+        className="size-full object-contain transition-transform duration-500 ease-out-soft group-hover:scale-[1.03]"
+        loading="lazy"
+      />
+      <span className="absolute bottom-1 left-1 rounded bg-canvas/85 px-1.5 text-[10px] font-medium text-muted">{label}</span>
     </div>
   );
 }
@@ -150,11 +155,11 @@ function HistoryCard({
   onDelete: () => void;
 }) {
   return (
-    <li className="card flex flex-col overflow-hidden">
+    <li className="card group flex flex-col overflow-hidden">
       <div className="grid aspect-[3/2] grid-cols-3 grid-rows-2 gap-px border-b border-line bg-line">
         <Thumb image={entry.output} label="Ergebnis" large />
-        <Thumb image={entry.image1} label="image1" />
-        <Thumb image={entry.image2} label="image2" />
+        <Thumb image={entry.image1} label="Person" />
+        <Thumb image={entry.image2} label="Kleidungsstück" />
       </div>
       <div className="flex flex-1 flex-col gap-1 px-4 py-3">
         <p className="truncate text-sm" title={`${entry.image1.name} + ${entry.image2.name}`}>

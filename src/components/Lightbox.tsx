@@ -36,7 +36,7 @@ export function Lightbox({ url, alt, caption, onDownload, onClose }: LightboxPro
       role="dialog"
       aria-modal="true"
       aria-label="Vollbildansicht"
-      className="fixed inset-0 z-50 flex flex-col bg-canvas/95 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex animate-fade-in flex-col bg-canvas/95 backdrop-blur-sm"
       onClick={onClose}
     >
       <div className="flex items-center justify-between gap-3 px-4 py-3" onClick={(event) => event.stopPropagation()}>
@@ -57,7 +57,7 @@ export function Lightbox({ url, alt, caption, onDownload, onClose }: LightboxPro
         <img
           src={url}
           alt={alt}
-          className="max-h-full max-w-full object-contain"
+          className="max-h-full max-w-full animate-zoom-in rounded-lg object-contain shadow-[0_30px_60px_-30px_rgb(23_32_54/0.5)]"
           onClick={(event) => event.stopPropagation()}
         />
       </div>

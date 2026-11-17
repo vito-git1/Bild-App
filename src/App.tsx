@@ -6,6 +6,7 @@ import { CreditsBar } from './components/CreditsBar';
 import { HistoryView } from './components/HistoryView';
 import { LegalFooter } from './components/LegalFooter';
 import { ResultPanel } from './components/ResultPanel';
+import { TapeMeasure } from './components/TapeMeasure';
 import { TopNav } from './components/TopNav';
 import { UploadSlot } from './components/UploadSlot';
 import { sendToWebhook, WebhookError } from './lib/api';
@@ -21,8 +22,8 @@ import type { AuthUser, HistoryEntry, ImageAsset, RequestState, SlotKey, UploadF
 type SlotRecord<T> = Record<SlotKey, T>;
 
 const SLOTS: Array<{ key: SlotKey; title: string; description: string }> = [
-  { key: 'image1', title: 'Person', description: 'Bild der Person hochladen' },
-  { key: 'image2', title: 'Kleidungsstück', description: 'Bild des Kleidungsstücks hochladen' },
+  { key: 'image1', title: 'Person', description: 'Ein Ganzkörperfoto, gut ausgeleuchtet' },
+  { key: 'image2', title: 'Kleidungsstück', description: 'Das Teil allein, am besten vor ruhigem Hintergrund' },
 ];
 
 /** Bilder werden vor dem Senden als WebP komprimiert (Fallback JPEG). */
@@ -356,15 +357,22 @@ export default function App() {
           </div>
         )}
 
-        {user === null && <AuthView onAuthenticated={setUser} />}
+        {user === null && (
+          <div className="animate-view-in">
+            <AuthView onAuthenticated={setUser} />
+          </div>
+        )}
 
         {user && view === 'studio' && (
-          <div className="mx-auto flex max-w-[820px] flex-col gap-8 pt-4 sm:pt-8">
-            <header className="text-center">
-              <h1 className="font-display text-3xl font-bold tracking-tight sm:text-[2.5rem]">KI-Bild-Generator</h1>
-              <p className="mt-3 text-[15px] text-muted sm:text-base">
-                Lade ein Personenbild und ein Kleidungsstück hoch, um ein neues Bild zu generieren
+          <div key="studio" className="mx-auto flex max-w-[820px] animate-view-in flex-col gap-8 pt-2 sm:pt-6">
+            <header>
+              <h1 className="text-[2.5rem] leading-[1.02] font-extrabold tracking-[-0.03em] [font-stretch:80%] sm:text-[3.75rem]">
+                Anprobe ohne Umkleide.
+              </h1>
+              <p className="mt-3 max-w-[34rem] text-[15px] leading-relaxed text-muted sm:text-base">
+                Ein Foto von dir, ein Foto vom Kleidungsstück – und du siehst, wie es an dir aussieht.
               </p>
+              <TapeMeasure motion="unroll" className="mt-6" />
             </header>
 
             <CreditsBar
@@ -379,9 +387,10 @@ export default function App() {
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-6">
                 <div className="grid gap-5 sm:grid-cols-2">
-                  {SLOTS.map((slot) => (
+                  {SLOTS.map((slot, index) => (
                     <UploadSlot
                       key={slot.key}
+                      step={index + 1}
                       slot={slot.key}
                       title={slot.title}
                       description={slot.description}
@@ -419,12 +428,13 @@ export default function App() {
               )}
             </div>
 
-            <p className="pb-4 text-center text-xs text-subtle">Powered by KI-Bildgenerierung</p>
           </div>
         )}
 
         {user && view === 'history' && (
-          <HistoryView revision={historyRevision} onRestore={handleRestore} onDownload={handleDownloadEntry} />
+          <div key="history" className="animate-view-in">
+            <HistoryView revision={historyRevision} onRestore={handleRestore} onDownload={handleDownloadEntry} />
+          </div>
         )}
 
       </main>

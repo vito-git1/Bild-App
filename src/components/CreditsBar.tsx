@@ -25,7 +25,7 @@ export function CreditsBar({ billing, buying, error, notice, onBuy, onDismissNot
   return (
     <div className="flex flex-col gap-2">
       {notice && (
-        <div className="flex items-start gap-2 rounded-lg bg-raised px-3 py-2 text-sm" role="status">
+        <div className="flex animate-slide-down items-start gap-2 rounded-lg bg-raised px-3 py-2 text-sm" role="status">
           <CircleCheck className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
           <span className="flex-1">{notice}</span>
           <button type="button" className="text-muted hover:text-fg" onClick={onDismissNotice} aria-label="Hinweis schließen">
@@ -42,7 +42,12 @@ export function CreditsBar({ billing, buying, error, notice, onBuy, onDismissNot
               <span className="font-medium text-danger">Dein Guthaben ist aufgebraucht.</span>
             ) : (
               <span>
-                Noch <strong>{billing.credits}</strong> {billing.credits === 1 ? 'Bild' : 'Bilder'}
+                Noch{' '}
+                {/* key: Zahl hüpft kurz, wenn sich das Guthaben ändert */}
+                <strong key={billing.credits} className="inline-block animate-pop font-display text-base tabular-nums">
+                  {billing.credits}
+                </strong>{' '}
+                {billing.credits === 1 ? 'Bild' : 'Bilder'}
               </span>
             )}
           </div>
@@ -58,7 +63,7 @@ export function CreditsBar({ billing, buying, error, notice, onBuy, onDismissNot
         </div>
 
         {billing.purchaseEnabled && confirming && (
-          <div className="flex flex-col gap-3 border-t border-line pt-3">
+          <div className="flex animate-slide-down flex-col gap-3 border-t border-line pt-3">
             <label className="flex items-start gap-2.5 text-sm" htmlFor={`${id}-waiver`}>
               <input
                 id={`${id}-waiver`}

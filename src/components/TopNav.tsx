@@ -20,10 +20,13 @@ export function TopNav({ user, view, onViewChange, onLoadSamples, loadingSamples
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 backdrop-blur">
       <div className="mx-auto grid h-14 max-w-[1440px] grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-6">
-        <span className="truncate font-display text-[15px] font-semibold tracking-tight">Kleiderstudio</span>
+        <span className="flex min-w-0 items-center gap-2 font-display text-[17px] font-extrabold tracking-tight">
+          <span className="h-3 w-5 shrink-0 rounded-[3px] border border-tape-edge bg-tape" aria-hidden />
+          <span className="truncate">Kleiderstudio</span>
+        </span>
 
         {user ? (
-          <nav aria-label="Ansichten" className="flex items-center gap-1">
+          <nav aria-label="Ansichten" className="flex items-center">
             {TABS.map((tab) => {
               const active = tab.value === view;
               return (
@@ -33,8 +36,10 @@ export function TopNav({ user, view, onViewChange, onLoadSamples, loadingSamples
                   aria-current={active ? 'page' : undefined}
                   onClick={() => onViewChange(tab.value)}
                   className={[
-                    'h-8 rounded-md px-2.5 text-sm font-medium transition-colors sm:px-3',
-                    active ? 'bg-raised text-fg' : 'text-muted hover:text-fg',
+                    'relative h-14 px-2.5 text-sm font-semibold transition-colors sm:px-3',
+                    // Aktiver Tab: Maßband-Streifen unten, der beim Wechsel aufgezogen wird.
+                    "after:absolute after:inset-x-2.5 after:bottom-0 after:h-[3px] after:origin-left after:rounded-t-sm after:bg-tape after:transition-transform after:duration-300 after:ease-out-soft after:content-[''] sm:after:inset-x-3",
+                    active ? 'text-fg after:scale-x-100' : 'text-muted after:scale-x-0 hover:text-fg',
                   ].join(' ')}
                 >
                   {tab.label}
